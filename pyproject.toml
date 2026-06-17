@@ -1,0 +1,10 @@
+[project]
+name = "aigithub-commercial-radar"
+version = "0.1.0"
+description = "Agentic GitHub open-source commercial opportunity radar"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+

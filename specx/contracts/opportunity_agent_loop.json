@@ -1,0 +1,113 @@
+{
+  "contract_id": "aigithub-opportunity-agent-loop",
+  "version": "0.1.0",
+  "objective": "Continuously discover GitHub open-source repositories with commercial opportunity, analyze adoption pain, design monetization paths, validate market viability, persist qualified opportunities, and create next actions.",
+  "domain": "open-source commercial opportunity discovery",
+  "task_type": "agentic_ops_loop",
+  "required_agents": [
+    "orchestrator_agent",
+    "scout_agent",
+    "repo_analyst",
+    "pain_finder",
+    "business_designer",
+    "validator_agent",
+    "strategist_agent"
+  ],
+  "required_tools": [
+    "github_collector",
+    "sqlite_storage",
+    "openai_compatible_orchestrator_llm",
+    "openai_compatible_worker_llm",
+    "specx_contract_cli",
+    "compiled_agent_specs"
+  ],
+  "required_evidence": [
+    "compiled SpecX execution plan exists before loop execution",
+    "compiled role/execution/output spec exists for every required agent",
+    "orchestrator agent produces a run plan before Scout Agent runs",
+    "skill file exists for every required agent",
+    "external agency-agent skill references are compiled into each relevant agent artifact before execution",
+    "GitHub repository metadata is collected by script before agent analysis",
+    "README evidence is collected before deep repository analysis",
+    "commercial validation receives explicit evidence payload before verdict",
+    "validator output includes Founder Playbook fields for problem hypothesis, customer discovery, competitive landscape, PMF versus hype, seven-day MVP test, agentic operations fit, and scope risk",
+    "database row is written only after status transition is validated",
+    "next actions are generated only after PASS or high-quality WEAK_PASS validation"
+  ],
+  "gates": [
+    {
+      "gate_id": "specx_contract_verified",
+      "condition": "SpecX validate, compile, and verify commands all return ok=true for this contract.",
+      "on_failure": "blocked"
+    },
+    {
+      "gate_id": "agent_specs_compiled",
+      "condition": "Each required agent has compiled role, execution, output, internal skill, and required external skill artifacts.",
+      "on_failure": "blocked"
+    },
+    {
+      "gate_id": "llm_available",
+      "condition": "Generic orchestrator and worker LLM API keys, base URLs, and models are available before any agent execution.",
+      "on_failure": "blocked"
+    },
+    {
+      "gate_id": "orchestrator_run_plan_created",
+      "condition": "Orchestrator Agent returns themes, search budget, deep analysis budget, validation budget, and gate sequence before downstream agents run.",
+      "on_failure": "blocked"
+    },
+    {
+      "gate_id": "repo_evidence_collected",
+      "condition": "Repository metadata and README evidence exist before Repo Analyst runs.",
+      "on_failure": "failed"
+    },
+    {
+      "gate_id": "validation_evidence_collected",
+      "condition": "Validator Agent receives GitHub heat, issue activity, license, recency, and topic evidence.",
+      "on_failure": "failed"
+    },
+    {
+      "gate_id": "founder_playbook_validation_completed",
+      "condition": "Validator Agent returns non-empty Founder Playbook validation fields before score persistence.",
+      "on_failure": "failed"
+    },
+    {
+      "gate_id": "approval_before_next_actions",
+      "condition": "Strategist Agent runs only after validator verdict is PASS or WEAK_PASS and opportunity score reaches the approval threshold.",
+      "on_failure": "failed"
+    }
+  ],
+  "expected_artifacts": [
+    "build/specx/opportunity_agent_loop.plan.json",
+    "build/compiled_specs/orchestrator_agent.compiled.json",
+    "build/compiled_specs/scout_agent.compiled.json",
+    "build/compiled_specs/repo_analyst.compiled.json",
+    "build/compiled_specs/pain_finder.compiled.json",
+    "build/compiled_specs/business_designer.compiled.json",
+    "build/compiled_specs/validator_agent.compiled.json",
+    "build/compiled_specs/strategist_agent.compiled.json",
+    "data/radar.sqlite3",
+    "daily opportunity report from report-today"
+  ],
+  "failure_semantics": {
+    "blocked": "A required gate or capability is missing before workflow execution can continue.",
+    "failed": "A required evidence, status transition, or artifact check failed during execution.",
+    "unsupported": "A requested capability is not implemented and must not be represented as successful execution."
+  },
+  "execution_constraints": {
+    "no_fake_success": true,
+    "no_silent_fallback": true,
+    "no_hardcoded_agent_decisions": true,
+    "llm_required_for_agent_decisions": true,
+    "scripts_collect_evidence_only": true,
+    "agent_core_logic_in_specs_and_skills": true,
+    "commercial_validation_not_local_deployment_validation": true
+  },
+  "human_approval": {
+    "required_for_task_mutation": true,
+    "required_for_replacing_llm_agent_with_script": true
+  },
+  "unsupported_features": [
+    "live SpecX MCP tools are not registered by the current plugin release",
+    "external Google Reddit YouTube Product Hunt X market search connectors are not implemented yet"
+  ]
+}

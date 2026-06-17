@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIGitHub Radar</title>
+  <link rel="icon" href='data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" rx="14" fill="%23ff7a00"/%3E%3Ctext x="32" y="39" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="800" fill="white"%3EAG%3C/text%3E%3C/svg%3E' />
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --surface: #fff;
+      --soft: #f1f5f9;
+      --ink: #111827;
+      --muted: #667085;
+      --line: #e2e8f0;
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --green: #059669;
+      --green-soft: #ecfdf5;
+      --orange: #d97706;
+      --orange-soft: #fff7ed;
+      --red: #dc2626;
+      --red-soft: #fef2f2;
+      --brand-orange: #ff7a00;
+      --shadow: 0 14px 35px rgba(15, 23, 42, .08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-size: 14px; line-height: 1.45; }
+    button { font: inherit; cursor: pointer; }
+    .topbar {
+      height: 68px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--line); background: rgba(255,255,255,.94); position: sticky; top: 0; z-index: 10;
+      backdrop-filter: blur(14px);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 760; font-size: 18px; }
+    .mark { width: 34px; height: 34px; border-radius: 8px; background: var(--brand-orange); color: #fff; display: grid; place-items: center; font-weight: 800; }
+    .nav, .seg { display: flex; align-items: center; gap: 4px; padding: 4px; background: var(--soft); border-radius: 8px; }
+    .nav button, .seg button { border: 0; background: transparent; color: var(--muted); padding: 8px 12px; border-radius: 6px; }
+    .nav .active, .seg .active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(15,23,42,.08); }
+    .actions { display: flex; align-items: center; gap: 12px; }
+    .toggle { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+    .switch { width: 38px; height: 22px; background: var(--green); border-radius: 999px; position: relative; }
+    .switch:after { content: ""; width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; right: 3px; top: 3px; }
+    .btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 9px 13px; border-radius: 7px; font-weight: 650; }
+    .primary { border-color: var(--blue); background: var(--blue); color: #fff; }
+    .shell { padding: 24px 28px 30px; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 22px; }
+    .main, .side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+    .today { display: grid; grid-template-columns: 1.35fr repeat(4, minmax(110px, .55fr)); gap: 12px; }
+    .panel, .summary { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+    .summary { padding: 18px; min-height: 110px; }
+    .summary.hero { display: flex; flex-direction: column; justify-content: space-between; }
+    .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    .metric { font-size: 27px; font-weight: 780; margin-top: 10px; }
+    .sub { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+    .best { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .best-title { font-size: 17px; font-weight: 760; }
+    .score { min-width: 52px; height: 52px; border-radius: 8px; display: grid; place-items: center; background: var(--green-soft); color: var(--green); font-weight: 800; font-size: 20px; }
+    .panel-head { padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); gap: 16px; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 24px; line-height: 1.2; }
+    h2 { font-size: 15px; }
+    h3 { font-size: 14px; }
+    .filters { display: flex; align-items: center; gap: 10px; }
+    .search { border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; width: 220px; color: var(--muted); background: var(--surface); }
+    .board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 14px; }
+    .lane { min-width: 0; background: #fbfcfe; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .lane-head { padding: 13px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+    .count { color: var(--muted); font-size: 12px; background: var(--soft); border-radius: 999px; padding: 3px 8px; }
+    .opp { padding: 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+    .opp:last-child { border-bottom: 0; }
+    .repo { font-weight: 760; display: flex; justify-content: space-between; gap: 8px; }
+    .repo span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chips { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border-radius: 999px; font-size: 12px; font-weight: 620; background: var(--soft); color: #475467; white-space: nowrap; }
+    .green { background: var(--green-soft); color: var(--green); }
+    .blue { background: var(--blue-soft); color: var(--blue); }
+    .orange { background: var(--orange-soft); color: var(--orange); }
+    .red { background: var(--red-soft); color: var(--red); }
+    .path { margin-top: 10px; color: var(--muted); font-size: 13px; }
+    .mini-action { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .mini-action button { padding: 6px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); font-weight: 650; }
+    .validation { padding: 14px 18px 18px; display: grid; gap: 12px; }
+    .val-row { display: grid; grid-template-columns: 190px 1fr 52px 160px; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .val-row:last-child { border-bottom: 0; }
+    .bar { height: 8px; background: var(--soft); border-radius: 999px; overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--blue); border-radius: inherit; }
+    .evidence { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .detail { padding: 18px; }
+    .detail-top { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+    .value-line { font-size: 16px; font-weight: 760; margin-top: 10px; }
+    .kv { margin-top: 16px; display: grid; gap: 12px; }
+    .kv div { display: grid; gap: 4px; }
+    .kv label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .055em; }
+    .kv p { color: #344054; font-size: 14px; }
+    .list { display: grid; gap: 10px; padding: 14px 18px 18px; }
+    .item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .item:last-child { border-bottom: 0; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--orange); flex: 0 0 auto; }
+    .dot.green-dot { background: var(--green); }
+    .dot.blue-dot { background: var(--blue); }
+    .task-meta { color: var(--muted); font-size: 12px; }
+    @media (max-width: 1120px) {
+      .shell { grid-template-columns: 1fr; }
+      .today { grid-template-columns: repeat(2, 1fr); }
+      .board { grid-template-columns: 1fr; }
+      .val-row { grid-template-columns: 1fr; align-items: start; gap: 8px; }
+      .topbar { height: auto; padding: 14px; flex-wrap: wrap; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><div class="mark">AG</div><span>AIGitHub Radar</span></div>
+    <nav class="nav"><button class="active">Radar</button><button>Opportunities</button><button>Experiments</button><button>Reports</button></nav>
+    <div class="actions"><div class="toggle"><span>Auto Loop</span><span class="switch"></span></div><button class="btn">Today</button><button class="btn primary">Run Once</button></div>
+  </header>
+  <main class="shell">
+    <section class="main">
+      <div class="today">
+        <div class="summary hero">
+          <div>
+            <div class="label">Today Best Opportunity</div>
+            <div class="best">
+              <div><div class="best-title">Open Generative AI Workflow</div><p class="sub">Template pack -> setup service -> niche SaaS experiment</p></div>
+              <div class="score">82</div>
+            </div>
+          </div>
+          <div class="chips"><span class="chip green">PASS</span><span class="chip blue">AI image workflow</span><span class="chip orange">License checked</span></div>
+        </div>
+        <div class="summary"><div class="label">Scanned Themes</div><div class="metric">3</div><p class="sub">AI CRM, RAG, Image</p></div>
+        <div class="summary"><div class="label">Repos Found</div><div class="metric">38</div><p class="sub">7 screened</p></div>
+        <div class="summary"><div class="label">Validated</div><div class="metric">3</div><p class="sub">1 pass, 2 watch</p></div>
+        <div class="summary"><div class="label">Actions Open</div><div class="metric">9</div><p class="sub">4 customer discovery</p></div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div><h1>Opportunity Board</h1><p class="sub">Agent-discovered opportunities sorted by validation quality and founder actionability.</p></div>
+          <div class="filters"><div class="seg"><button class="active">Today</button><button>7d</button><button>30d</button></div><div class="search">Search repos, themes...</div></div>
+        </div>
+        <div class="board">
+          <div class="lane">
+            <div class="lane-head"><h2>Focus</h2><span class="count">2</span></div>
+            <article class="opp"><div class="repo"><span>Open-Generative-AI</span><strong>82</strong></div><div class="chips"><span class="chip green">PASS</span><span class="chip blue">Template Pack</span></div><p class="path">Creators need a usable AI media workflow without stitching APIs by hand.</p><div class="mini-action"><span class="sub">Next: landing page test</span><button>Open</button></div></article>
+            <article class="opp"><div class="repo"><span>Browser Agent Monitor</span><strong>80</strong></div><div class="chips"><span class="chip green">PASS</span><span class="chip blue">Hosted monitor</span></div><p class="path">Ops teams need repeatable browser task monitoring and failure proof.</p><div class="mini-action"><span class="sub">Next: interview 5 users</span><button>Open</button></div></article>
+          </div>
+          <div class="lane">
+            <div class="lane-head"><h2>Watchlist</h2><span class="count">4</span></div>
+            <article class="opp"><div class="repo"><span>CordysCRM</span><strong>72</strong></div><div class="chips"><span class="chip orange">WEAK_PASS</span><span class="chip blue">Setup Service</span></div><p class="path">Strong repo heat, but buyer urgency and Chinese market gap need proof.</p><div class="mini-action"><span class="sub">Next: customer discovery</span><button>Open</button></div></article>
+            <article class="opp"><div class="repo"><span>RAG Dashboard Kit</span><strong>68</strong></div><div class="chips"><span class="chip orange">HOLD</span><span class="chip">SaaS maybe</span></div><p class="path">Useful admin surface; crowded category, needs vertical angle.</p><div class="mini-action"><span class="sub">Next: competitor map</span><button>Open</button></div></article>
+          </div>
+          <div class="lane">
+            <div class="lane-head"><h2>Rejected</h2><span class="count">6</span></div>
+            <article class="opp"><div class="repo"><span>Generic Agent Starter</span><strong>41</strong></div><div class="chips"><span class="chip red">SATURATED</span><span class="chip">Too generic</span></div><p class="path">No specific buyer, weak willingness-to-pay evidence.</p><div class="mini-action"><span class="sub">Archived with reason</span><button>Review</button></div></article>
+            <article class="opp"><div class="repo"><span>GPL Automation Suite</span><strong>37</strong></div><div class="chips"><span class="chip red">LICENSE_RISK</span></div><p class="path">Packaging path conflicts with intended commercial use.</p><div class="mini-action"><span class="sub">No next action</span><button>Review</button></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><h2>Founder Playbook Validation</h2><p class="sub">Evidence-first validation before building anything.</p></div><span class="chip blue">Selected: Open-Generative-AI</span></div>
+        <div class="validation">
+          <div class="val-row"><h3>Problem Hypothesis</h3><div class="bar"><i style="width:84%"></i></div><strong>84</strong><p class="evidence">Creators want repeatable pipelines without API glue.</p></div>
+          <div class="val-row"><h3>Customer Discovery</h3><div class="bar"><i style="width:62%"></i></div><strong>62</strong><p class="evidence">Needs 5 creator interviews before MVP build.</p></div>
+          <div class="val-row"><h3>Competition Map</h3><div class="bar"><i style="width:78%"></i></div><strong>78</strong><p class="evidence">Many tools, few workflow templates for Chinese operators.</p></div>
+          <div class="val-row"><h3>PMF vs Hype</h3><div class="bar"><i style="width:70%"></i></div><strong>70</strong><p class="evidence">High repo heat; payment signal still partial.</p></div>
+          <div class="val-row"><h3>7-Day MVP</h3><div class="bar"><i style="width:88%"></i></div><strong>88</strong><p class="evidence">Landing page + template outline + concierge setup.</p></div>
+          <div class="val-row"><h3>Agentic Ops Fit</h3><div class="bar"><i style="width:91%"></i></div><strong>91</strong><p class="evidence">Automate source scan, template diff, and delivery QA.</p></div>
+        </div>
+      </section>
+    </section>
+
+    <aside class="side">
+      <section class="panel detail">
+        <div class="detail-top"><div><h2>Opportunity Card</h2><p class="sub">Source repo: Anil-matcha/Open-Generative-AI</p></div><span class="chip green">Focus</span></div>
+        <p class="value-line">One-click AI media workflow kits for creators and small teams.</p>
+        <div class="kv">
+          <div><label>Target User</label><p>Short-video operators, content studios, indie AI creators.</p></div>
+          <div><label>Ordinary-user Blocker</label><p>Too many model APIs, weak workflow defaults, English-first docs.</p></div>
+          <div><label>Best Path</label><p>Template pack -> Chinese tutorial -> setup service -> narrow SaaS.</p></div>
+          <div><label>MVP Form</label><p>Paid workflow pack with 3 ready scenarios and concierge onboarding.</p></div>
+          <div><label>Estimated Price</label><p>$49 template pack, $499 setup service.</p></div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Risk Register</h2><span class="chip orange">3 open</span></div>
+        <div class="list">
+          <div class="item"><span class="dot"></span><div><strong>Payment proof incomplete</strong><p class="task-meta">Run landing page test before build.</p></div></div>
+          <div class="item"><span class="dot green-dot"></span><div><strong>License acceptable</strong><p class="task-meta">MIT, commercial packaging allowed.</p></div></div>
+          <div class="item"><span class="dot"></span><div><strong>Category crowded</strong><p class="task-meta">Differentiate by workflow packaging.</p></div></div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Next Actions</h2><button class="btn">Add</button></div>
+        <div class="list">
+          <div class="item"><span class="dot blue-dot"></span><div><strong>Interview 5 creator operators</strong><p class="task-meta">Customer discovery · high</p></div></div>
+          <div class="item"><span class="dot green-dot"></span><div><strong>Draft template pack outline</strong><p class="task-meta">MVP PRD · high</p></div></div>
+          <div class="item"><span class="dot"></span><div><strong>Create landing page copy</strong><p class="task-meta">Validation experiment · medium</p></div></div>
+          <div class="item"><span class="dot blue-dot"></span><div><strong>Write teardown article</strong><p class="task-meta">Content asset · medium</p></div></div>
+        </div>
+      </section>
+    </aside>
+  </main>
+</body>
+</html>
