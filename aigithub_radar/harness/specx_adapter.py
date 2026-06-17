@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
-
-
-PLUGIN_CLI = Path("/Users/xin/.codex/plugins/cache/xin-local-plugins/specx-codex-plugin/0.1.0/scripts/specx_cli.py")
 
 
 class SpecXAdapter:
@@ -14,10 +12,12 @@ class SpecXAdapter:
         self.root = root
         self.contract_path = root / "specx" / "contracts" / "opportunity_agent_loop.json"
         self.plan_path = root / "build" / "specx" / "opportunity_agent_loop.plan.json"
+        configured_cli = os.environ.get("SPECX_CLI_PATH", "").strip()
+        self.plugin_cli = Path(configured_cli) if configured_cli else None
 
     def compile_contract(self) -> Path:
-        if not PLUGIN_CLI.exists():
-            raise RuntimeError(f"SpecX CLI is missing: {PLUGIN_CLI}")
+        if self.plugin_cli is None or not self.plugin_cli.exists():
+            raise RuntimeError("SpecX CLI is missing; set SPECX_CLI_PATH in .env")
         self._run("validate")
         self._run("verify")
         compiled = self._run("compile")
@@ -34,7 +34,7 @@ class SpecXAdapter:
 
     def _run(self, command: str) -> dict:
         proc = subprocess.run(
-            [sys.executable, str(PLUGIN_CLI), command, str(self.contract_path)],
+            [sys.executable, str(self.plugin_cli), command, str(self.contract_path)],
             check=False,
             text=True,
             capture_output=True,
@@ -45,4 +45,3 @@ class SpecXAdapter:
         if payload.get("ok") is not True:
             raise RuntimeError(json.dumps(payload, ensure_ascii=False))
         return payload
-

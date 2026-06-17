@@ -50,6 +50,7 @@ def main() -> None:
         return
 
     if args.command == "compile-specs":
+        load_env_file(ROOT / ".env")
         plan_path = SpecXAdapter(ROOT).compile_contract()
         compiler = SpecCompiler(ROOT)
         compiled = compiler.compile_all()

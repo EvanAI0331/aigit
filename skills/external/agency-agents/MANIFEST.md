@@ -1,6 +1,6 @@
 # Agency Agents External Skill Manifest
 
-Imported from `/Users/xin/Downloads/agency-agents-main (1).zip`.
+Imported from the user-provided `agency-agents-main` archive.
 
 These files are vendor role-skill references. Do not treat them as autonomous agents by themselves. In this project they are loaded as supporting skill context for LLM-backed project agents.
 
@@ -18,4 +18,3 @@ These files are vendor role-skill references. Do not treat them as autonomous ag
 - `marketing-china-market-localization-strategist.md`: China localization and channel fit.
 - `testing-evidence-collector.md`: evidence-first QA discipline.
 - `testing-reality-checker.md`: skepticism against unsupported approvals.
-
