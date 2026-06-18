@@ -14,7 +14,7 @@ Return:
       "title": "",
       "description": "",
       "priority": "high",
-      "evidence_required": "what result note or proof must be recorded to validate this action"
+      "evidence_required": "what structured evidence must be recorded: evidence_type, signal_strength, customer_count, payment_signal, or negative_reason"
     }
   ]
 }

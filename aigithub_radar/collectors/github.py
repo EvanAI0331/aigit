@@ -11,6 +11,9 @@ import urllib.request
 class GitHubCollector:
     api = "https://api.github.com"
 
+    def __init__(self) -> None:
+        self.last_rate_limit: dict[str, str] = {}
+
     def search_repositories(self, query: str, per_page: int) -> list[dict]:
         params = urllib.parse.urlencode({"q": query, "sort": "stars", "order": "desc", "per_page": per_page})
         payload = self._get(f"/search/repositories?{params}")
@@ -52,10 +55,21 @@ class GitHubCollector:
         req = urllib.request.Request(f"{self.api}{path}", headers=self._headers())
         try:
             with urllib.request.urlopen(req, timeout=45) as resp:
+                self._capture_rate_limit(resp.headers)
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
+            self._capture_rate_limit(exc.headers)
             body = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"GitHub HTTP {exc.code}: {body[:500]}") from exc
+
+    def _capture_rate_limit(self, headers) -> None:
+        self.last_rate_limit = {
+            "limit": headers.get("X-RateLimit-Limit", ""),
+            "remaining": headers.get("X-RateLimit-Remaining", ""),
+            "reset": headers.get("X-RateLimit-Reset", ""),
+            "resource": headers.get("X-RateLimit-Resource", ""),
+            "used": headers.get("X-RateLimit-Used", ""),
+        }
 
     @staticmethod
     def _headers() -> dict[str, str]:

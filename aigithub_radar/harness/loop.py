@@ -4,6 +4,7 @@ from pathlib import Path
 
 from aigithub_radar.collectors.github import GitHubCollector
 from aigithub_radar.collectors.market import MarketEvidenceCollector
+from aigithub_radar.dispatch import DispatchManager
 from aigithub_radar.harness.agent_runtime import AgentRuntime
 from aigithub_radar.harness.contracts import APPROVAL_THRESHOLD, LoopSummary
 from aigithub_radar.harness.llm import OrchestratorLLMClient, WorkerLLMClient, load_env_file
@@ -22,6 +23,7 @@ class OpportunityLoop:
         self.db = Database(db_path)
         self.collector = GitHubCollector()
         self.market_collector = MarketEvidenceCollector()
+        self.dispatcher = DispatchManager(self.db)
         orchestrator_llm = OrchestratorLLMClient()
         worker_llm = WorkerLLMClient()
         self.runtime = AgentRuntime(
@@ -73,8 +75,10 @@ class OpportunityLoop:
                     repos = self.collector.search_repositories(str(query), per_page=planned_repos_per_theme)
                 except Exception as exc:
                     self.db.add_event(run_id, "EVIDENCE_FAILED", "github_search", {"query": query, "error": str(exc)})
+                    self._record_github_rate_limit(run_id)
                     continue
                 self.db.add_event(run_id, "EVIDENCE_COLLECTED", "github_search", {"query": query, "count": len(repos)})
+                self._record_github_rate_limit(run_id)
                 for repo in repos:
                     repo_id = self.db.upsert_repo(repo)
                     discovered += 1
@@ -111,6 +115,7 @@ class OpportunityLoop:
                 approved=approved,
             )
             self.db.finish_run(run_id, "SUCCEEDED")
+            self.dispatcher.dispatch_run(run_id, summary.to_text())
             return summary
         except Exception as exc:
             self.db.add_event(run_id, "RUN_FAILED", None, {"error": str(exc)})
@@ -138,7 +143,15 @@ class OpportunityLoop:
         verdict = validation.get("verdict")
         if action_state.get("done_signal_strength", 0) >= 50 and verdict in {"PASS", "WEAK_PASS"}:
             return "ACTION_VALIDATED"
-        if action_state.get("open", 0) > 0 and verdict == "WEAK_PASS":
+        if action_state.get("payment_signals", 0) > 0 and verdict in {"PASS", "WEAK_PASS"}:
+            return "ACTION_VALIDATED"
+        if action_state.get("customer_count", 0) >= 3 and verdict in {"PASS", "WEAK_PASS"}:
+            return "ACTION_VALIDATED"
+        if action_state.get("negative_results", 0) > 0 and action_state.get("done_signal_strength", 0) < -30:
+            return "HOLD"
+        if verdict == "WEAK_PASS" and score >= 55:
+            return "EXPERIMENTING"
+        if action_state.get("open", 0) > 0 and verdict in {"PASS", "WEAK_PASS"}:
             return "EXPERIMENTING"
         if score >= APPROVAL_THRESHOLD and verdict in {"PASS", "WEAK_PASS"}:
             return "APPROVED"
@@ -258,3 +271,7 @@ class OpportunityLoop:
             elif status in {"EXPERIMENTING", "WATCHLIST"} and validation.get("verdict") == "WEAK_PASS" and score >= 65:
                 self._create_next_actions(run_id, opportunity_id, repo, business, validation)
         return revalidated, reapproved
+
+    def _record_github_rate_limit(self, run_id: int) -> None:
+        if self.collector.last_rate_limit:
+            self.db.add_event(run_id, "RATE_LIMIT", "github", self.collector.last_rate_limit)

@@ -75,8 +75,19 @@ class Database:
                   output_json text,
                   status text not null,
                   error text,
+                  duration_ms integer,
                   created_at text default current_timestamp,
                   completed_at text
+                );
+                create table if not exists dispatches (
+                  id integer primary key,
+                  run_id integer,
+                  target text not null,
+                  subject text not null,
+                  body text not null,
+                  status text not null,
+                  response text,
+                  created_at text default current_timestamp
                 );
                 create table if not exists repos (
                   id integer primary key,
@@ -154,6 +165,9 @@ class Database:
                   evidence_required text,
                   evidence_type text,
                   signal_strength integer default 0,
+                  customer_count integer default 0,
+                  payment_signal text,
+                  negative_reason text,
                   result_note text,
                   created_at text default current_timestamp,
                   updated_at text default current_timestamp,
@@ -163,6 +177,7 @@ class Database:
             )
             self._migrate_validations(conn)
             self._migrate_next_actions(conn)
+            self._migrate_agent_invocations(conn)
             for theme in DEFAULT_THEMES:
                 conn.execute("insert or ignore into themes(theme) values (?)", (theme,))
 
@@ -200,18 +215,18 @@ class Database:
             )
             return int(cur.lastrowid)
 
-    def finish_agent_invocation(self, invocation_id: int, output: dict) -> None:
+    def finish_agent_invocation(self, invocation_id: int, output: dict, duration_ms: int | None = None) -> None:
         with self.connect() as conn:
             conn.execute(
-                "update agent_invocations set output_json = ?, status = 'SUCCEEDED', completed_at = current_timestamp where id = ?",
-                (json.dumps(output, ensure_ascii=False), invocation_id),
+                "update agent_invocations set output_json = ?, status = 'SUCCEEDED', duration_ms = ?, completed_at = current_timestamp where id = ?",
+                (json.dumps(output, ensure_ascii=False), duration_ms, invocation_id),
             )
 
-    def fail_agent_invocation(self, invocation_id: int, error: str) -> None:
+    def fail_agent_invocation(self, invocation_id: int, error: str, duration_ms: int | None = None) -> None:
         with self.connect() as conn:
             conn.execute(
-                "update agent_invocations set status = 'FAILED', error = ?, completed_at = current_timestamp where id = ?",
-                (error, invocation_id),
+                "update agent_invocations set status = 'FAILED', error = ?, duration_ms = ?, completed_at = current_timestamp where id = ?",
+                (error, duration_ms, invocation_id),
             )
 
     def latest_run_snapshot(self) -> dict:
@@ -224,7 +239,7 @@ class Database:
                 (run["id"],),
             ).fetchall()
             invocations = conn.execute(
-                "select agent, status, error, created_at, completed_at from agent_invocations where run_id = ? order by id asc",
+                "select agent, status, error, duration_ms, created_at, completed_at from agent_invocations where run_id = ? order by id asc",
                 (run["id"],),
             ).fetchall()
         return {
@@ -364,9 +379,22 @@ class Database:
                 "select coalesce(sum(signal_strength), 0) as n from next_actions where opportunity_id = ? and status = 'done'",
                 (opportunity_id,),
             ).fetchone()
+            structured = conn.execute(
+                """
+                select coalesce(sum(customer_count), 0) as customer_count,
+                       sum(case when payment_signal in ('paid','preorder','budget_confirmed') then 1 else 0 end) as payment_signals,
+                       sum(case when negative_reason is not null and negative_reason != '' then 1 else 0 end) as negative_results
+                from next_actions
+                where opportunity_id = ? and status in ('done','closed')
+                """,
+                (opportunity_id,),
+            ).fetchone()
         result = {row["status"]: row["n"] for row in rows}
         result["stale_open"] = stale["n"] if stale else 0
         result["done_signal_strength"] = strength["n"] if strength else 0
+        result["customer_count"] = structured["customer_count"] if structured else 0
+        result["payment_signals"] = structured["payment_signals"] if structured else 0
+        result["negative_results"] = structured["negative_results"] if structured else 0
         return result
 
     def create_opportunity(self, repo_id: int, repo: dict, status: str) -> None:
@@ -498,20 +526,33 @@ class Database:
             )
             return int(cur.lastrowid)
 
-    def update_next_action(self, action_id: int, status: str, result_note: str | None = None, evidence_type: str | None = None, signal_strength: int | None = None) -> None:
+    def update_next_action(
+        self,
+        action_id: int,
+        status: str,
+        result_note: str | None = None,
+        evidence_type: str | None = None,
+        signal_strength: int | None = None,
+        customer_count: int | None = None,
+        payment_signal: str | None = None,
+        negative_reason: str | None = None,
+    ) -> None:
         if status not in {"open", "done", "closed"}:
             raise ValueError(f"invalid action status: {status}")
         completed_expr = "current_timestamp" if status in {"done", "closed"} else "null"
         strength = max(-100, min(100, int(signal_strength or 0)))
+        customers = max(0, int(customer_count or 0))
         with self.connect() as conn:
             conn.execute(
                 f"""
                 update next_actions
                 set status = ?, result_note = coalesce(?, result_note), evidence_type = coalesce(?, evidence_type),
-                    signal_strength = ?, updated_at = current_timestamp, completed_at = {completed_expr}
+                    signal_strength = ?, customer_count = ?, payment_signal = coalesce(?, payment_signal),
+                    negative_reason = coalesce(?, negative_reason),
+                    updated_at = current_timestamp, completed_at = {completed_expr}
                 where id = ?
                 """,
-                (status, result_note, evidence_type, strength, action_id),
+                (status, result_note, evidence_type, strength, customers, payment_signal, negative_reason, action_id),
             )
             row = conn.execute("select opportunity_id from next_actions where id = ?", (action_id,)).fetchone()
             if row and status == "done":
@@ -538,6 +579,69 @@ class Database:
                 params,
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def open_actions_for_dispatch(self, limit: int = 20) -> list[dict]:
+        return self.next_actions(limit=limit)
+
+    def record_dispatch(self, run_id: int | None, target: str, subject: str, body: str, status: str, response: str | None = None) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "insert into dispatches(run_id, target, subject, body, status, response) values (?, ?, ?, ?, ?, ?)",
+                (run_id, target, subject, body, status, response),
+            )
+
+    def governance_snapshot(self) -> dict:
+        with self.connect() as conn:
+            latest = conn.execute("select id from runs order by id desc limit 1").fetchone()
+            run_id = latest["id"] if latest else None
+            events = conn.execute(
+                """
+                select event_type, subject, payload_json, created_at
+                from run_events
+                where (? is null or run_id = ?)
+                order by id desc
+                limit 120
+                """,
+                (run_id, run_id),
+            ).fetchall()
+            invocations = conn.execute(
+                """
+                select agent, status, error, duration_ms
+                from agent_invocations
+                where (? is null or run_id = ?)
+                order by id desc
+                limit 120
+                """,
+                (run_id, run_id),
+            ).fetchall()
+            dispatches = conn.execute(
+                "select target, subject, status, response, created_at from dispatches order by id desc limit 20"
+            ).fetchall()
+        failed_queries = []
+        github_rate_limit = {}
+        for row in events:
+            payload = _safe_json(row["payload_json"])
+            if row["event_type"] == "EVIDENCE_FAILED":
+                failed_queries.append({"subject": row["subject"], **payload})
+            if row["event_type"] == "RATE_LIMIT" and row["subject"] == "github":
+                github_rate_limit = payload
+        durations = [int(row["duration_ms"] or 0) for row in invocations if row["duration_ms"]]
+        return {
+            "run_id": run_id,
+            "github_rate_limit": github_rate_limit,
+            "llm": {
+                "calls": len(invocations),
+                "failed": sum(1 for row in invocations if row["status"] == "FAILED"),
+                "total_duration_ms": sum(durations),
+                "avg_duration_ms": int(sum(durations) / len(durations)) if durations else 0,
+                "timeouts": sum(1 for row in invocations if "timed out" in str(row["error"] or "").lower() or "timeout" in str(row["error"] or "").lower()),
+                "estimated_cost": None,
+                "cost_note": "No token usage or pricing table is stored; cost is not estimated.",
+            },
+            "failed_queries": failed_queries,
+            "agent_invocations": [dict(row) for row in invocations],
+            "dispatches": [dict(row) for row in dispatches],
+        }
 
     @staticmethod
     def _assert_status(status: str) -> None:
@@ -568,6 +672,9 @@ class Database:
             "evidence_required": "text",
             "evidence_type": "text",
             "signal_strength": "integer default 0",
+            "customer_count": "integer default 0",
+            "payment_signal": "text",
+            "negative_reason": "text",
             "updated_at": "text",
             "completed_at": "text",
         }
@@ -576,6 +683,12 @@ class Database:
                 conn.execute(f"alter table next_actions add column {name} {column_type}")
         if "updated_at" not in existing:
             conn.execute("update next_actions set updated_at = coalesce(created_at, current_timestamp)")
+
+    @staticmethod
+    def _migrate_agent_invocations(conn: sqlite3.Connection) -> None:
+        existing = {row["name"] for row in conn.execute("pragma table_info(agent_invocations)").fetchall()}
+        if "duration_ms" not in existing:
+            conn.execute("alter table agent_invocations add column duration_ms integer")
 
     @staticmethod
     def _assert_founder_playbook_validation(validation: dict) -> None:
@@ -599,3 +712,11 @@ class Database:
         missing = [key for key in required if validation.get(key) in (None, "")]
         if missing:
             raise RuntimeError(f"validator_agent missing Founder Playbook fields: {', '.join(missing)}")
+
+
+def _safe_json(raw: str | None) -> dict:
+    try:
+        parsed = json.loads(raw or "{}")
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}

@@ -35,7 +35,9 @@
     "old SCREENED backlog opportunities are periodically promoted into deep analysis instead of remaining permanently screened",
     "EXPERIMENTING, ACTION_PENDING, and ACTION_VALIDATED states represent live experiment progress and must not be treated as fake completion",
     "next action status changes are persisted and fed back into later validation evidence",
-    "next actions include due dates, evidence requirements, evidence type, signal strength, and result notes",
+    "next actions include due dates, evidence requirements, evidence type, signal strength, customer count, payment signal, negative reason, and result notes",
+    "daily report and new/open action summaries are dispatched to at least one configured outlet, with unsupported or unconfigured outlets recorded as skipped instead of success",
+    "governance metrics are recorded for GitHub rate limits, LLM call latency, missing cost telemetry, failed evidence queries, and agent timeouts",
     "external market evidence is collected by scripts and interpreted only by validation or business agents",
     "validator output includes Founder Playbook fields for problem hypothesis, customer discovery, competitive landscape, PMF versus hype, seven-day MVP test, agentic operations fit, and scope risk",
     "database row is written only after status transition is validated",
@@ -84,7 +86,17 @@
     },
     {
       "gate_id": "action_feedback_recorded",
-      "condition": "Next actions can be created, marked done, or closed, and status plus due date, evidence requirement, evidence type, signal strength, and result note are available to future validator runs.",
+      "condition": "Next actions can be created, marked done, or closed, and status plus due date, evidence requirement, evidence type, signal strength, customer count, payment signal, negative reason, and result note are available to future validator runs.",
+      "on_failure": "failed"
+    },
+    {
+      "gate_id": "dispatch_completed_or_skipped",
+      "condition": "Each successful loop records dispatch results for configured outlets, including local notification and optional GitHub issue.",
+      "on_failure": "failed"
+    },
+    {
+      "gate_id": "governance_metrics_recorded",
+      "condition": "Each loop exposes GitHub rate-limit state, failed evidence query statistics, LLM latency, timeout count, and cost telemetry availability.",
       "on_failure": "failed"
     },
     {
@@ -125,6 +137,6 @@
   },
   "unsupported_features": [
     "live SpecX MCP tools are not registered by the current plugin release",
-    "full authenticated Product Hunt, YouTube, Google Trends, and X APIs are not configured; public query URLs are recorded as evidence until connectors are configured"
+    "authenticated Notion, email, Telegram, Feishu, Product Hunt GraphQL, YouTube Data API, Google Trends API, and X API connectors are not configured; implemented dispatch and market collectors must record skipped or failed status rather than fake success"
   ]
 }

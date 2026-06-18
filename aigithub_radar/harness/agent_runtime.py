@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import time
 
 from aigithub_radar.harness.contracts import AGENT_REQUIRED_OUTPUT_FIELDS
 from aigithub_radar.harness.llm import LLMClient
@@ -27,17 +28,18 @@ class AgentRuntime:
             ]
         )
         user = json.dumps(payload, ensure_ascii=False, indent=2)
+        started = time.monotonic()
         try:
             result = self.llms.get(agent, self.default_llm).complete_json(system=system, user=user)
             if not isinstance(result, dict):
                 raise RuntimeError(f"{agent} returned non-object JSON")
             self._assert_output_contract(agent, result)
             if invocation_id is not None:
-                db.finish_agent_invocation(invocation_id, result)
+                db.finish_agent_invocation(invocation_id, result, int((time.monotonic() - started) * 1000))
             return result
         except Exception as exc:
             if invocation_id is not None:
-                db.fail_agent_invocation(invocation_id, str(exc))
+                db.fail_agent_invocation(invocation_id, str(exc), int((time.monotonic() - started) * 1000))
             raise
 
     def _load(self, agent: str) -> dict:

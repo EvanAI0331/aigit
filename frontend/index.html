@@ -167,6 +167,10 @@
         <div class="list" id="runList"></div>
       </section>
       <section class="panel">
+        <div class="panel-head"><h2>Ops Governance</h2><span class="chip" id="govStatus">--</span></div>
+        <div class="list" id="governanceList"></div>
+      </section>
+      <section class="panel">
         <div class="panel-head"><h2>Next Actions</h2><button class="btn" id="addActionBtn" type="button">Add</button></div>
         <div class="list" id="actionList"></div>
       </section>
@@ -179,10 +183,10 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    const state = { summary: null, opportunities: [], latest: null, actions: [], selected: null, range: 'today', view: 'radar', query: '' };
+    const state = { summary: null, opportunities: [], latest: null, actions: [], governance: null, selected: null, range: 'today', view: 'radar', query: '' };
     const lanes = [
-      { key: 'focus', title: 'Focus', test: o => ['APPROVED', 'NEXT_ACTION_CREATED', 'STORED'].includes(o.status) },
-      { key: 'watch', title: 'Watchlist', test: o => !String(o.status || '').startsWith('REJECTED_') && !['APPROVED', 'NEXT_ACTION_CREATED', 'STORED'].includes(o.status) },
+      { key: 'focus', title: 'Focus', test: o => ['APPROVED', 'NEXT_ACTION_CREATED', 'STORED', 'ACTION_VALIDATED'].includes(o.status) },
+      { key: 'watch', title: 'Experiments', test: o => ['EXPERIMENTING', 'ACTION_PENDING', 'WATCHLIST', 'VALIDATED', 'ANALYZED', 'HOLD'].includes(o.status) },
       { key: 'reject', title: 'Rejected', test: o => String(o.status || '').startsWith('REJECTED_') }
     ];
 
@@ -190,7 +194,7 @@
     const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const score = o => Math.max(Number(o.commercial_score || 0), Number(o.validation_score || 0), 0);
     const localTime = value => value ? new Date(String(value).replace(' ', 'T') + 'Z').toLocaleString() : '--';
-    const chipClass = status => String(status || '').startsWith('REJECTED_') ? 'red' : ['APPROVED', 'NEXT_ACTION_CREATED', 'STORED'].includes(status) ? 'green' : ['WATCHLIST', 'VALIDATED'].includes(status) ? 'orange' : 'blue';
+    const chipClass = status => String(status || '').startsWith('REJECTED_') ? 'red' : ['APPROVED', 'NEXT_ACTION_CREATED', 'STORED', 'ACTION_VALIDATED'].includes(status) ? 'green' : ['WATCHLIST', 'VALIDATED', 'EXPERIMENTING', 'ACTION_PENDING'].includes(status) ? 'orange' : 'blue';
 
     async function api(path) {
       const res = await fetch(path, { cache: 'no-store' });
@@ -246,7 +250,7 @@
       $('board').innerHTML = lanes.map(lane => {
         let items = visible.filter(lane.test);
         if (state.view === 'opportunities') items = items.filter(o => score(o) > 0);
-        if (state.view === 'experiments') items = items.filter(o => ['WATCHLIST', 'VALIDATED', 'ANALYZED'].includes(o.status));
+        if (state.view === 'experiments') items = items.filter(o => ['EXPERIMENTING', 'ACTION_PENDING', 'ACTION_VALIDATED', 'WATCHLIST', 'VALIDATED', 'ANALYZED'].includes(o.status));
         if (state.view === 'reports') items = items.slice(0, 12);
         const cards = items.slice(0, 18).map(renderCard).join('') || `<div class="empty">No records in this lane.</div>`;
         return `<div class="lane"><div class="lane-head"><h2>${lane.title}</h2><span class="count">${items.length}</span></div>${cards}</div>`;
@@ -314,6 +318,23 @@
       ].join('');
       const events = (latest.events || []).slice(0, 8);
       $('evidenceList').innerHTML = events.map(e => `<div class="item"><span class="dot ${e.subject === 'github_search' ? 'blue-dot' : ''}"></span><div><strong>${esc(e.subject || e.event_type)}</strong><p class="task-meta">${esc(e.created_at)} · ${esc(summarizePayload(e.payload_json))}</p></div></div>`).join('') || '<div class="empty">No evidence events yet.</div>';
+      renderGovernance();
+    }
+
+    function renderGovernance() {
+      const g = state.governance || {};
+      const rate = g.github_rate_limit || {};
+      const llm = g.llm || {};
+      const fails = g.failed_queries || [];
+      const dispatches = g.dispatches || [];
+      $('govStatus').textContent = fails.length ? `${fails.length} failures` : 'ok';
+      $('govStatus').className = `chip ${fails.length ? 'orange' : 'green'}`;
+      $('governanceList').innerHTML = [
+        `<div class="item"><span class="dot blue-dot"></span><div><strong>GitHub rate limit</strong><p class="task-meta">remaining ${esc(rate.remaining || '--')} / ${esc(rate.limit || '--')} · used ${esc(rate.used || '--')}</p></div></div>`,
+        `<div class="item"><span class="dot green-dot"></span><div><strong>LLM calls</strong><p class="task-meta">${esc(llm.calls || 0)} calls · avg ${esc(llm.avg_duration_ms || 0)} ms · timeouts ${esc(llm.timeouts || 0)} · cost ${esc(llm.estimated_cost ?? 'not estimated')}</p></div></div>`,
+        `<div class="item"><span class="dot"></span><div><strong>Failed queries</strong><p class="task-meta">${fails.slice(0, 3).map(f => `${f.subject || ''} ${f.query || ''}`).join(' | ') || 'none'}</p></div></div>`,
+        `<div class="item"><span class="dot blue-dot"></span><div><strong>Dispatch</strong><p class="task-meta">${dispatches.slice(0, 3).map(d => `${d.target}:${d.status}`).join(' | ') || 'none yet'}</p></div></div>`
+      ].join('');
     }
 
     function renderActions() {
@@ -326,7 +347,7 @@
           : '';
         const due = a.due_at ? ` · due ${esc(a.due_at)}` : '';
         const evidence = a.evidence_required ? `<p class="task-meta">Evidence: ${esc(a.evidence_required)}</p>` : '';
-        const result = a.result_note ? `<p class="task-meta">Result: ${esc(a.result_note)} · strength ${esc(a.signal_strength || 0)}</p>` : '';
+        const result = a.result_note ? `<p class="task-meta">Result: ${esc(a.result_note)} · type ${esc(a.evidence_type || 'other')} · strength ${esc(a.signal_strength || 0)} · customers ${esc(a.customer_count || 0)} · payment ${esc(a.payment_signal || 'none')}${a.negative_reason ? ' · negative ' + esc(a.negative_reason) : ''}</p>` : '';
         return `<div class="item"><span class="dot ${cls}"></span><div><strong>${esc(a.title)}</strong><p class="task-meta">${esc(a.status)} · ${esc(a.priority || 'medium')} · ${esc(a.full_name || '')}${due}</p>${evidence}${result}${controls}</div></div>`;
       }).join('') || '<div class="empty">No actions for this opportunity.</div>';
       document.querySelectorAll('[data-action-done]').forEach(btn => btn.addEventListener('click', () => updateAction(Number(btn.dataset.actionDone), 'done')));
@@ -346,11 +367,12 @@
 
     async function loadData() {
       try {
-        const [summary, opps, latest, actions] = await Promise.all([api('/api/summary'), api('/api/opportunities'), api('/api/latest-run'), api('/api/actions')]);
+        const [summary, opps, latest, actions, governance] = await Promise.all([api('/api/summary'), api('/api/opportunities'), api('/api/latest-run'), api('/api/actions'), api('/api/governance')]);
         state.summary = summary;
         state.opportunities = opps.opportunities || [];
         state.latest = latest;
         state.actions = actions.actions || [];
+        state.governance = governance;
         if (!state.selected && state.opportunities.length) state.selected = state.opportunities.slice().sort((a, b) => score(b) - score(a))[0];
         renderSummary(); renderBoard(); renderDetail(); renderRun();
       } catch (err) {
@@ -399,7 +421,10 @@
       const result = prompt(status === 'done' ? 'Result note' : 'Close reason') || '';
       const evidenceType = status === 'done' ? (prompt('Evidence type: customer_interview, payment, usage, rejection, other') || 'other') : 'rejection';
       const signalStrength = status === 'done' ? Number(prompt('Signal strength -100 to 100') || 0) : -25;
-      await postJson('/api/actions/update', { action_id: actionId, status, result_note: result, evidence_type: evidenceType, signal_strength: signalStrength });
+      const customerCount = status === 'done' ? Number(prompt('Customer count reached') || 0) : 0;
+      const paymentSignal = status === 'done' ? (prompt('Payment signal: none, budget_confirmed, preorder, paid') || 'none') : 'none';
+      const negativeReason = status === 'closed' ? result : (signalStrength < 0 ? (prompt('Negative reason, optional') || '') : '');
+      await postJson('/api/actions/update', { action_id: actionId, status, result_note: result, evidence_type: evidenceType, signal_strength: signalStrength, customer_count: customerCount, payment_signal: paymentSignal, negative_reason: negativeReason });
       showToast(`Action marked ${status}`);
       await loadData();
     }

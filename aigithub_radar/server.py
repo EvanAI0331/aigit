@@ -64,6 +64,9 @@ class RadarHandler(BaseHTTPRequestHandler):
         if path == "/api/actions":
             self._json({"actions": self.db.next_actions()})
             return
+        if path == "/api/governance":
+            self._json(self.db.governance_snapshot())
+            return
         self._json({"error": "not found"}, status=404)
 
     def _handle_api_post(self, path: str) -> None:
@@ -91,6 +94,9 @@ class RadarHandler(BaseHTTPRequestHandler):
                     payload.get("result_note"),
                     payload.get("evidence_type"),
                     payload.get("signal_strength"),
+                    payload.get("customer_count"),
+                    payload.get("payment_signal"),
+                    payload.get("negative_reason"),
                 )
                 self._json({"ok": True})
                 return
@@ -105,8 +111,8 @@ class RadarHandler(BaseHTTPRequestHandler):
                 """
                 select
                   count(*) as total,
-                  sum(case when status in ('APPROVED','NEXT_ACTION_CREATED','STORED') then 1 else 0 end) as focus,
-                  sum(case when status in ('WATCHLIST','HOLD','VALIDATED') then 1 else 0 end) as watchlist,
+                  sum(case when status in ('APPROVED','NEXT_ACTION_CREATED','STORED','ACTION_VALIDATED') then 1 else 0 end) as focus,
+                  sum(case when status in ('WATCHLIST','HOLD','VALIDATED','EXPERIMENTING','ACTION_PENDING') then 1 else 0 end) as watchlist,
                   sum(case when status like 'REJECTED_%' then 1 else 0 end) as rejected
                 from opportunities
                 """
