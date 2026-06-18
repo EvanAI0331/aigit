@@ -86,53 +86,17 @@ class OpportunityLoop:
             validated = 0
             approved = 0
             for repo in screened_repos[:planned_deep_limit]:
-                try:
-                    repo = self.collector.enrich_repository(repo)
-                except Exception as exc:
-                    self.db.add_event(run_id, "EVIDENCE_FAILED", "repo_readme", {"repo": repo.get("full_name"), "error": str(exc)})
-                    continue
-                self.db.add_event(run_id, "EVIDENCE_COLLECTED", "repo_readme", {"repo": repo["full_name"], "has_readme": bool(repo.get("readme"))})
-                repo_id = self.db.upsert_repo(repo)
-                opportunity_id = self.db.ensure_opportunity(repo_id, repo)
+                result = self._analyze_and_validate_repo(run_id, repo, validated < planned_validate_limit)
+                analyzed += result["analyzed"]
+                validated += result["validated"]
+                approved += result["approved"]
 
-                analysis = self.runtime.run("repo_analyst", {"repo": repo}, run_id=run_id, db=self.db)
-                pain = self.runtime.run("pain_finder", {"repo": repo, "analysis": analysis}, run_id=run_id, db=self.db)
-                business = self.runtime.run("business_designer", {"repo": repo, "analysis": analysis, "pain": pain}, run_id=run_id, db=self.db)
-                self.db.save_analysis(opportunity_id, analysis, pain, business)
-                analyzed += 1
-
-                if validated >= planned_validate_limit:
-                    continue
-
-                validation_evidence = {
-                    "github": self.collector.commercial_signals(repo),
-                    "market": self.market_collector.collect(repo, analysis, pain),
-                    "actions": self.db.action_summary(opportunity_id),
-                }
-                self.db.add_event(run_id, "EVIDENCE_COLLECTED", "commercial_signals", {"repo": repo["full_name"], "evidence": validation_evidence})
-                validation = self.runtime.run(
-                    "validator_agent",
-                    {"repo": repo, "analysis": analysis, "pain": pain, "business": business, "evidence": validation_evidence},
-                    run_id=run_id,
-                    db=self.db,
-                )
-                self.db.save_validation(opportunity_id, validation)
-                validated += 1
-
-                score = opportunity_score(
-                    fact_score(repo),
-                    int(business.get("judgment_score", 0)),
-                    int(validation.get("validation_score", 0)),
-                    int(validation.get("founder_playbook_score", validation.get("validation_score", 0))),
-                )
-                status = self._status_from_validation(score, validation)
-                self.db.update_opportunity_score(opportunity_id, score, status)
-
-                if status == "APPROVED":
-                    self._create_next_actions(run_id, opportunity_id, repo, business, validation)
-                    approved += 1
-                elif status == "WATCHLIST" and validation.get("verdict") == "WEAK_PASS" and score >= 65:
-                    self._create_next_actions(run_id, opportunity_id, repo, business, validation)
+            backlog_budget = max(1, planned_deep_limit)
+            for candidate in self.db.screened_backlog_candidates(backlog_budget):
+                result = self._analyze_and_validate_repo(run_id, candidate, validated < planned_validate_limit + backlog_budget, backlog=True)
+                analyzed += result["analyzed"]
+                validated += result["validated"]
+                approved += result["approved"]
 
             revalidated, reapproved = self._revalidate_watchlist(run_id, planned_validate_limit)
             validated += revalidated
@@ -169,8 +133,13 @@ class OpportunityLoop:
         return (selected or fallback)[:cap]
 
     @staticmethod
-    def _status_from_validation(score: int, validation: dict) -> str:
+    def _status_from_validation(score: int, validation: dict, action_state: dict | None = None) -> str:
+        action_state = action_state or {}
         verdict = validation.get("verdict")
+        if action_state.get("done_signal_strength", 0) >= 50 and verdict in {"PASS", "WEAK_PASS"}:
+            return "ACTION_VALIDATED"
+        if action_state.get("open", 0) > 0 and verdict == "WEAK_PASS":
+            return "EXPERIMENTING"
         if score >= APPROVAL_THRESHOLD and verdict in {"PASS", "WEAK_PASS"}:
             return "APPROVED"
         if verdict == "HOLD":
@@ -181,6 +150,52 @@ class OpportunityLoop:
         if reject_status:
             return str(reject_status)
         return "REJECTED_LOW_DEMAND"
+
+    def _analyze_and_validate_repo(self, run_id: int, repo: dict, should_validate: bool, backlog: bool = False) -> dict:
+        try:
+            repo = self.collector.enrich_repository(repo)
+        except Exception as exc:
+            self.db.add_event(run_id, "EVIDENCE_FAILED", "repo_readme" if not backlog else "screened_backlog_readme", {"repo": repo.get("full_name"), "error": str(exc)})
+            return {"analyzed": 0, "validated": 0, "approved": 0}
+        self.db.add_event(run_id, "EVIDENCE_COLLECTED", "repo_readme" if not backlog else "screened_backlog_readme", {"repo": repo["full_name"], "has_readme": bool(repo.get("readme"))})
+        repo_id = self.db.upsert_repo(repo)
+        opportunity_id = self.db.ensure_opportunity(repo_id, repo)
+        analysis = self.runtime.run("repo_analyst", {"repo": repo, "backlog": backlog}, run_id=run_id, db=self.db)
+        pain = self.runtime.run("pain_finder", {"repo": repo, "analysis": analysis, "backlog": backlog}, run_id=run_id, db=self.db)
+        business = self.runtime.run("business_designer", {"repo": repo, "analysis": analysis, "pain": pain, "backlog": backlog}, run_id=run_id, db=self.db)
+        self.db.save_analysis(opportunity_id, analysis, pain, business)
+        if not should_validate:
+            return {"analyzed": 1, "validated": 0, "approved": 0}
+        action_state = self.db.action_summary(opportunity_id)
+        validation_evidence = {
+            "github": self.collector.commercial_signals(repo),
+            "market": self.market_collector.collect(repo, analysis, pain),
+            "actions": action_state,
+            "screened_backlog": backlog,
+        }
+        self.db.add_event(run_id, "EVIDENCE_COLLECTED", "commercial_signals" if not backlog else "screened_backlog_evidence", {"repo": repo["full_name"], "evidence": validation_evidence})
+        validation = self.runtime.run(
+            "validator_agent",
+            {"repo": repo, "analysis": analysis, "pain": pain, "business": business, "evidence": validation_evidence},
+            run_id=run_id,
+            db=self.db,
+        )
+        self.db.save_validation(opportunity_id, validation)
+        score = opportunity_score(
+            fact_score(repo),
+            int(business.get("judgment_score", 0)),
+            int(validation.get("validation_score", 0)),
+            int(validation.get("founder_playbook_score", validation.get("validation_score", 0))),
+        )
+        status = self._status_from_validation(score, validation, action_state)
+        self.db.update_opportunity_score(opportunity_id, score, status)
+        approved = 0
+        if status in {"APPROVED", "EXPERIMENTING", "ACTION_VALIDATED"}:
+            self._create_next_actions(run_id, opportunity_id, repo, business, validation)
+            approved = 1 if status in {"APPROVED", "ACTION_VALIDATED"} else 0
+        elif status == "WATCHLIST" and validation.get("verdict") == "WEAK_PASS" and score >= 65:
+            self._create_next_actions(run_id, opportunity_id, repo, business, validation)
+        return {"analyzed": 1, "validated": 1, "approved": approved}
 
     def _create_next_actions(self, run_id: int, opportunity_id: int, repo: dict, business: dict, validation: dict) -> None:
         action_state = self.db.action_summary(opportunity_id)
@@ -235,11 +250,11 @@ class OpportunityLoop:
                 int(validation.get("validation_score", 0)),
                 int(validation.get("founder_playbook_score", validation.get("validation_score", 0))),
             )
-            status = self._status_from_validation(score, validation)
+            status = self._status_from_validation(score, validation, action_evidence)
             self.db.update_opportunity_score(opportunity_id, score, status)
-            if status == "APPROVED":
+            if status in {"APPROVED", "ACTION_VALIDATED"}:
                 self._create_next_actions(run_id, opportunity_id, repo, business, validation)
                 reapproved += 1
-            elif status == "WATCHLIST" and validation.get("verdict") == "WEAK_PASS" and score >= 65:
+            elif status in {"EXPERIMENTING", "WATCHLIST"} and validation.get("verdict") == "WEAK_PASS" and score >= 65:
                 self._create_next_actions(run_id, opportunity_id, repo, business, validation)
         return revalidated, reapproved

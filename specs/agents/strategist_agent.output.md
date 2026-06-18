@@ -13,9 +13,9 @@ Return:
       "action_type": "mvp_prd",
       "title": "",
       "description": "",
-      "priority": "high"
+      "priority": "high",
+      "evidence_required": "what result note or proof must be recorded to validate this action"
     }
   ]
 }
 ```
-

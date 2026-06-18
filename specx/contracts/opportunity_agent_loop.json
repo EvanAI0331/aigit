@@ -32,7 +32,10 @@
     "commercial validation receives explicit evidence payload before verdict",
     "watchlist, analyzed, validated, and hold opportunities are re-evaluated with fresh repository, market, and action-state evidence",
     "WEAK_PASS opportunities with strong enough scores create low-cost validation next actions instead of waiting for full approval",
+    "old SCREENED backlog opportunities are periodically promoted into deep analysis instead of remaining permanently screened",
+    "EXPERIMENTING, ACTION_PENDING, and ACTION_VALIDATED states represent live experiment progress and must not be treated as fake completion",
     "next action status changes are persisted and fed back into later validation evidence",
+    "next actions include due dates, evidence requirements, evidence type, signal strength, and result notes",
     "external market evidence is collected by scripts and interpreted only by validation or business agents",
     "validator output includes Founder Playbook fields for problem hypothesis, customer discovery, competitive landscape, PMF versus hype, seven-day MVP test, agentic operations fit, and scope risk",
     "database row is written only after status transition is validated",
@@ -81,7 +84,7 @@
     },
     {
       "gate_id": "action_feedback_recorded",
-      "condition": "Next actions can be created, marked done, or closed, and their status is available to future validator runs.",
+      "condition": "Next actions can be created, marked done, or closed, and status plus due date, evidence requirement, evidence type, signal strength, and result note are available to future validator runs.",
       "on_failure": "failed"
     },
     {

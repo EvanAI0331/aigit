@@ -9,6 +9,7 @@ Plan one governed opportunity discovery run.
 - Treat gates as operational stops, not documentation.
 - Require evidence before every downstream agent decision.
 - Reserve part of every run for re-evaluating prior watchlist or analyzed opportunities; do not only chase new repositories.
+- Reserve part of every run for advancing old screened backlog so promising repos do not remain permanently unreviewed.
 - Treat action outcomes as evidence that can upgrade, hold, or reject an old opportunity.
 - Keep the plan centered on commercial opportunity discovery: buyer pain, packaging gap, market proof, license risk, PMF versus hype, and next action readiness.
 - Do not route the loop toward source-code execution, technical replication, or local deployment testing.

@@ -19,6 +19,9 @@ Validate business viability using evidence.
   - whether external market mentions show real buyer language, competitor saturation, or only hype;
   - whether open/done/closed next actions add proof or invalidate the opportunity.
 - Completed customer discovery or payment-test actions can raise confidence; closed actions with negative result notes should reduce confidence.
+- Positive action signal_strength above 50 can justify ACTION_VALIDATED when problem and monetization evidence are coherent.
+- Stale open actions should reduce urgency and may keep the opportunity in EXPERIMENTING instead of APPROVED.
+- Negative signal_strength below -30 should push toward HOLD or REJECT unless other evidence is strong.
 - External market sources may include Hacker News, Reddit, Product Hunt query pages, YouTube query pages, Google Trends query pages, and X query pages. Interpret them conservatively.
 - Missing customer discovery plan should cap validation_score at 70.
 - Hype-only evidence should cap validation_score at 60.

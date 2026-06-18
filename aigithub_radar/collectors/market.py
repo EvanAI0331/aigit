@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 
 
 class MarketEvidenceCollector:
@@ -68,35 +70,45 @@ class MarketEvidenceCollector:
         }
 
     def _product_hunt(self, query: str) -> dict:
+        url = "https://www.producthunt.com/search?q=" + urllib.parse.quote_plus(query)
+        html = self._get_text(url)
         return {
             "source": "product_hunt",
-            "available": False,
-            "query_url": "https://www.producthunt.com/search?q=" + urllib.parse.quote_plus(query),
-            "note": "Public search page recorded for follow-up; API connector not configured.",
+            "available": bool(html) and "error" not in html[:80].lower(),
+            "query_url": url,
+            "items": self._html_titles(html, limit=5),
         }
 
     def _youtube(self, query: str) -> dict:
+        url = "https://www.youtube.com/feeds/videos.xml?search_query=" + urllib.parse.quote_plus(query)
+        text = self._get_text(url)
+        items = self._rss_items(text, limit=5)
         return {
             "source": "youtube",
-            "available": False,
+            "available": bool(items),
             "query_url": "https://www.youtube.com/results?search_query=" + urllib.parse.quote_plus(query),
-            "note": "Public query URL recorded for follow-up; API connector not configured.",
+            "items": items,
         }
 
     def _google_trends(self, query: str) -> dict:
+        url = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=US"
+        text = self._get_text(url)
+        items = [item for item in self._rss_items(text, limit=25) if self._matches(query, item.get("title", ""))][:5]
         return {
             "source": "google_trends",
-            "available": False,
+            "available": bool(text),
             "query_url": "https://trends.google.com/trends/explore?q=" + urllib.parse.quote_plus(query),
-            "note": "Trend query URL recorded for follow-up; API connector not configured.",
+            "items": items,
         }
 
     def _x(self, query: str) -> dict:
+        url = "https://x.com/search?q=" + urllib.parse.quote_plus(query) + "&src=typed_query"
+        html = self._get_text(url)
         return {
             "source": "x",
-            "available": False,
-            "query_url": "https://x.com/search?q=" + urllib.parse.quote_plus(query) + "&src=typed_query",
-            "note": "Public query URL recorded for follow-up; API connector not configured.",
+            "available": bool(html) and "error" not in html[:80].lower(),
+            "query_url": url,
+            "items": self._html_titles(html, limit=5),
         }
 
     @staticmethod
@@ -107,3 +119,64 @@ class MarketEvidenceCollector:
                 return json.loads(resp.read().decode("utf-8"))
         except Exception as exc:
             return {"error": str(exc)}
+
+    @staticmethod
+    def _get_text(url: str) -> str:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 aigithub-commercial-radar"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                return resp.read().decode("utf-8", errors="replace")
+        except Exception as exc:
+            return f"error: {exc}"
+
+    @staticmethod
+    def _rss_items(text: str, limit: int) -> list[dict]:
+        if not text or text.startswith("error:"):
+            return []
+        try:
+            root = ET.fromstring(text)
+        except ET.ParseError:
+            return []
+        result = []
+        for item in root.findall(".//item")[:limit]:
+            result.append(
+                {
+                    "title": (item.findtext("title") or "").strip(),
+                    "url": (item.findtext("link") or "").strip(),
+                    "published": (item.findtext("pubDate") or item.findtext("{http://www.w3.org/2005/Atom}published") or "").strip(),
+                }
+            )
+        if result:
+            return result
+        ns = {"atom": "http://www.w3.org/2005/Atom", "media": "http://search.yahoo.com/mrss/"}
+        for entry in root.findall(".//atom:entry", ns)[:limit]:
+            link = entry.find("atom:link", ns)
+            result.append(
+                {
+                    "title": (entry.findtext("atom:title", default="", namespaces=ns) or "").strip(),
+                    "url": link.get("href") if link is not None else "",
+                    "published": (entry.findtext("atom:published", default="", namespaces=ns) or "").strip(),
+                }
+            )
+        return result
+
+    @staticmethod
+    def _html_titles(html: str, limit: int) -> list[dict]:
+        if not html or html.startswith("error:"):
+            return []
+        titles = []
+        for match in re.finditer(r"<title[^>]*>(.*?)</title>|<h[12][^>]*>(.*?)</h[12]>", html, flags=re.I | re.S):
+            raw = match.group(1) or match.group(2) or ""
+            title = re.sub(r"<[^>]+>", "", raw)
+            title = re.sub(r"\s+", " ", title).strip()
+            if title and title not in titles:
+                titles.append(title)
+            if len(titles) >= limit:
+                break
+        return [{"title": title} for title in titles]
+
+    @staticmethod
+    def _matches(query: str, text: str) -> bool:
+        words = {word.lower() for word in re.findall(r"[a-zA-Z0-9]{4,}", query)}
+        target = text.lower()
+        return any(word in target for word in words)

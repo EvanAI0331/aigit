@@ -324,7 +324,10 @@
         const controls = a.status === 'open'
           ? `<div class="mini-action"><button type="button" data-action-done="${a.id}">Done</button><button type="button" data-action-close="${a.id}">Close</button></div>`
           : '';
-        return `<div class="item"><span class="dot ${cls}"></span><div><strong>${esc(a.title)}</strong><p class="task-meta">${esc(a.status)} · ${esc(a.priority || 'medium')} · ${esc(a.full_name || '')}</p>${controls}</div></div>`;
+        const due = a.due_at ? ` · due ${esc(a.due_at)}` : '';
+        const evidence = a.evidence_required ? `<p class="task-meta">Evidence: ${esc(a.evidence_required)}</p>` : '';
+        const result = a.result_note ? `<p class="task-meta">Result: ${esc(a.result_note)} · strength ${esc(a.signal_strength || 0)}</p>` : '';
+        return `<div class="item"><span class="dot ${cls}"></span><div><strong>${esc(a.title)}</strong><p class="task-meta">${esc(a.status)} · ${esc(a.priority || 'medium')} · ${esc(a.full_name || '')}${due}</p>${evidence}${result}${controls}</div></div>`;
       }).join('') || '<div class="empty">No actions for this opportunity.</div>';
       document.querySelectorAll('[data-action-done]').forEach(btn => btn.addEventListener('click', () => updateAction(Number(btn.dataset.actionDone), 'done')));
       document.querySelectorAll('[data-action-close]').forEach(btn => btn.addEventListener('click', () => updateAction(Number(btn.dataset.actionClose), 'closed')));
@@ -385,14 +388,18 @@
       const title = prompt('Action title');
       if (!title) return;
       const description = prompt('Action description') || '';
-      await postJson('/api/actions', { opportunity_id: state.selected.id, action_type: 'manual', title, description, priority: 'medium' });
+      const evidenceRequired = prompt('Evidence required') || 'customer, payment, usage, or rejection evidence';
+      const dueAt = prompt('Due date YYYY-MM-DD HH:MM, optional') || null;
+      await postJson('/api/actions', { opportunity_id: state.selected.id, action_type: 'manual', title, description, priority: 'medium', evidence_required: evidenceRequired, due_at: dueAt });
       showToast('Action created');
       await loadData();
     });
 
     async function updateAction(actionId, status) {
       const result = prompt(status === 'done' ? 'Result note' : 'Close reason') || '';
-      await postJson('/api/actions/update', { action_id: actionId, status, result_note: result });
+      const evidenceType = status === 'done' ? (prompt('Evidence type: customer_interview, payment, usage, rejection, other') || 'other') : 'rejection';
+      const signalStrength = status === 'done' ? Number(prompt('Signal strength -100 to 100') || 0) : -25;
+      await postJson('/api/actions/update', { action_id: actionId, status, result_note: result, evidence_type: evidenceType, signal_strength: signalStrength });
       showToast(`Action marked ${status}`);
       await loadData();
     }

@@ -150,6 +150,10 @@ class Database:
                   description text,
                   priority text,
                   status text default 'open',
+                  due_at text,
+                  evidence_required text,
+                  evidence_type text,
+                  signal_strength integer default 0,
                   result_note text,
                   created_at text default current_timestamp,
                   updated_at text default current_timestamp,
@@ -293,8 +297,32 @@ class Database:
                        o.validation_score, o.priority, r.*
                 from opportunities o
                 join repos r on r.id = o.source_repo
-                where o.status in ('WATCHLIST','ANALYZED','VALIDATED','HOLD')
+                where o.status in ('WATCHLIST','ANALYZED','VALIDATED','HOLD','EXPERIMENTING','ACTION_PENDING','ACTION_VALIDATED')
                 order by o.updated_at asc
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
+        result = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["topics"] = json.loads(item.get("topics") or "[]")
+            except json.JSONDecodeError:
+                item["topics"] = []
+            result.append(item)
+        return result
+
+    def screened_backlog_candidates(self, limit: int) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                select o.id as opportunity_id, o.status as opportunity_status, o.commercial_score,
+                       o.validation_score, o.priority, r.*
+                from opportunities o
+                join repos r on r.id = o.source_repo
+                where o.status = 'SCREENED'
+                order by r.stars desc, o.updated_at asc
                 limit ?
                 """,
                 (limit,),
@@ -328,7 +356,18 @@ class Database:
                 "select status, count(*) as n from next_actions where opportunity_id = ? group by status",
                 (opportunity_id,),
             ).fetchall()
-        return {row["status"]: row["n"] for row in rows}
+            stale = conn.execute(
+                "select count(*) as n from next_actions where opportunity_id = ? and status = 'open' and due_at is not null and due_at < current_timestamp",
+                (opportunity_id,),
+            ).fetchone()
+            strength = conn.execute(
+                "select coalesce(sum(signal_strength), 0) as n from next_actions where opportunity_id = ? and status = 'done'",
+                (opportunity_id,),
+            ).fetchone()
+        result = {row["status"]: row["n"] for row in rows}
+        result["stale_open"] = stale["n"] if stale else 0
+        result["done_signal_strength"] = strength["n"] if strength else 0
+        return result
 
     def create_opportunity(self, repo_id: int, repo: dict, status: str) -> None:
         self._assert_status(status)
@@ -425,33 +464,58 @@ class Database:
         with self.connect() as conn:
             for action in rows:
                 conn.execute(
-                    "insert into next_actions(opportunity_id, action_type, title, description, priority) values (?, ?, ?, ?, ?)",
-                    (opportunity_id, action["action_type"], action["title"], action.get("description", ""), action.get("priority", "medium")),
+                    """
+                    insert into next_actions(opportunity_id, action_type, title, description, priority, due_at, evidence_required)
+                    values (?, ?, ?, ?, ?, datetime(current_timestamp, '+7 days'), ?)
+                    """,
+                    (
+                        opportunity_id,
+                        action["action_type"],
+                        action["title"],
+                        action.get("description", ""),
+                        action.get("priority", "medium"),
+                        action.get("evidence_required", "result note with customer, payment, usage, or rejection evidence"),
+                    ),
                 )
+            conn.execute("update opportunities set status = 'ACTION_PENDING', updated_at = current_timestamp where id = ?", (opportunity_id,))
 
     def create_next_action(self, opportunity_id: int, action: dict) -> int:
         with self.connect() as conn:
             cur = conn.execute(
-                "insert into next_actions(opportunity_id, action_type, title, description, priority, status) values (?, ?, ?, ?, ?, 'open')",
+                """
+                insert into next_actions(opportunity_id, action_type, title, description, priority, due_at, evidence_required, status)
+                values (?, ?, ?, ?, ?, ?, ?, 'open')
+                """,
                 (
                     opportunity_id,
                     action.get("action_type", "manual"),
                     action["title"],
                     action.get("description", ""),
                     action.get("priority", "medium"),
+                    action.get("due_at"),
+                    action.get("evidence_required", ""),
                 ),
             )
             return int(cur.lastrowid)
 
-    def update_next_action(self, action_id: int, status: str, result_note: str | None = None) -> None:
+    def update_next_action(self, action_id: int, status: str, result_note: str | None = None, evidence_type: str | None = None, signal_strength: int | None = None) -> None:
         if status not in {"open", "done", "closed"}:
             raise ValueError(f"invalid action status: {status}")
         completed_expr = "current_timestamp" if status in {"done", "closed"} else "null"
+        strength = max(-100, min(100, int(signal_strength or 0)))
         with self.connect() as conn:
             conn.execute(
-                f"update next_actions set status = ?, result_note = coalesce(?, result_note), updated_at = current_timestamp, completed_at = {completed_expr} where id = ?",
-                (status, result_note, action_id),
+                f"""
+                update next_actions
+                set status = ?, result_note = coalesce(?, result_note), evidence_type = coalesce(?, evidence_type),
+                    signal_strength = ?, updated_at = current_timestamp, completed_at = {completed_expr}
+                where id = ?
+                """,
+                (status, result_note, evidence_type, strength, action_id),
             )
+            row = conn.execute("select opportunity_id from next_actions where id = ?", (action_id,)).fetchone()
+            if row and status == "done":
+                conn.execute("update opportunities set status = 'ACTION_VALIDATED', updated_at = current_timestamp where id = ?", (row["opportunity_id"],))
 
     def next_actions(self, opportunity_id: int | None = None, limit: int = 100) -> list[dict]:
         where = ""
@@ -500,6 +564,10 @@ class Database:
         existing = {row["name"] for row in conn.execute("pragma table_info(next_actions)").fetchall()}
         columns = {
             "result_note": "text",
+            "due_at": "text",
+            "evidence_required": "text",
+            "evidence_type": "text",
+            "signal_strength": "integer default 0",
             "updated_at": "text",
             "completed_at": "text",
         }

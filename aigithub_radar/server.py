@@ -78,12 +78,20 @@ class RadarHandler(BaseHTTPRequestHandler):
                         "title": payload["title"],
                         "description": payload.get("description", ""),
                         "priority": payload.get("priority", "medium"),
+                        "due_at": payload.get("due_at"),
+                        "evidence_required": payload.get("evidence_required", ""),
                     },
                 )
                 self._json({"ok": True, "action_id": action_id})
                 return
             if path == "/api/actions/update":
-                self.db.update_next_action(int(payload["action_id"]), str(payload["status"]), payload.get("result_note"))
+                self.db.update_next_action(
+                    int(payload["action_id"]),
+                    str(payload["status"]),
+                    payload.get("result_note"),
+                    payload.get("evidence_type"),
+                    payload.get("signal_strength"),
+                )
                 self._json({"ok": True})
                 return
         except Exception as exc:
