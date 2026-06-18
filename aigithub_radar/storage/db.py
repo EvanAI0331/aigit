@@ -392,9 +392,9 @@ class Database:
         result = {row["status"]: row["n"] for row in rows}
         result["stale_open"] = stale["n"] if stale else 0
         result["done_signal_strength"] = strength["n"] if strength else 0
-        result["customer_count"] = structured["customer_count"] if structured else 0
-        result["payment_signals"] = structured["payment_signals"] if structured else 0
-        result["negative_results"] = structured["negative_results"] if structured else 0
+        result["customer_count"] = structured["customer_count"] or 0 if structured else 0
+        result["payment_signals"] = structured["payment_signals"] or 0 if structured else 0
+        result["negative_results"] = structured["negative_results"] or 0 if structured else 0
         return result
 
     def create_opportunity(self, repo_id: int, repo: dict, status: str) -> None:

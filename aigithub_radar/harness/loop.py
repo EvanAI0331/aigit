@@ -141,17 +141,22 @@ class OpportunityLoop:
     def _status_from_validation(score: int, validation: dict, action_state: dict | None = None) -> str:
         action_state = action_state or {}
         verdict = validation.get("verdict")
-        if action_state.get("done_signal_strength", 0) >= 50 and verdict in {"PASS", "WEAK_PASS"}:
+        done_strength = int(action_state.get("done_signal_strength") or 0)
+        open_actions = int(action_state.get("open") or 0)
+        payment_signals = int(action_state.get("payment_signals") or 0)
+        customer_count = int(action_state.get("customer_count") or 0)
+        negative_results = int(action_state.get("negative_results") or 0)
+        if done_strength >= 50 and verdict in {"PASS", "WEAK_PASS"}:
             return "ACTION_VALIDATED"
-        if action_state.get("payment_signals", 0) > 0 and verdict in {"PASS", "WEAK_PASS"}:
+        if payment_signals > 0 and verdict in {"PASS", "WEAK_PASS"}:
             return "ACTION_VALIDATED"
-        if action_state.get("customer_count", 0) >= 3 and verdict in {"PASS", "WEAK_PASS"}:
+        if customer_count >= 3 and verdict in {"PASS", "WEAK_PASS"}:
             return "ACTION_VALIDATED"
-        if action_state.get("negative_results", 0) > 0 and action_state.get("done_signal_strength", 0) < -30:
+        if negative_results > 0 and done_strength < -30:
             return "HOLD"
         if verdict == "WEAK_PASS" and score >= 55:
             return "EXPERIMENTING"
-        if action_state.get("open", 0) > 0 and verdict in {"PASS", "WEAK_PASS"}:
+        if open_actions > 0 and verdict in {"PASS", "WEAK_PASS"}:
             return "EXPERIMENTING"
         if score >= APPROVAL_THRESHOLD and verdict in {"PASS", "WEAK_PASS"}:
             return "APPROVED"
