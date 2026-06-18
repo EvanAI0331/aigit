@@ -150,11 +150,15 @@ class Database:
                   description text,
                   priority text,
                   status text default 'open',
-                  created_at text default current_timestamp
+                  result_note text,
+                  created_at text default current_timestamp,
+                  updated_at text default current_timestamp,
+                  completed_at text
                 );
                 """
             )
             self._migrate_validations(conn)
+            self._migrate_next_actions(conn)
             for theme in DEFAULT_THEMES:
                 conn.execute("insert or ignore into themes(theme) values (?)", (theme,))
 
@@ -260,6 +264,72 @@ class Database:
             )
             return int(conn.execute("select id from repos where full_name = ?", (repo["full_name"],)).fetchone()["id"])
 
+    def repo_for_opportunity(self, opportunity_id: int) -> dict:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                select o.id as opportunity_id, o.status as opportunity_status, o.commercial_score,
+                       o.validation_score, o.priority, r.*
+                from opportunities o
+                join repos r on r.id = o.source_repo
+                where o.id = ?
+                """,
+                (opportunity_id,),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError(f"opportunity not found: {opportunity_id}")
+        item = dict(row)
+        try:
+            item["topics"] = json.loads(item.get("topics") or "[]")
+        except json.JSONDecodeError:
+            item["topics"] = []
+        return item
+
+    def revalidation_candidates(self, limit: int) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                select o.id as opportunity_id, o.status as opportunity_status, o.commercial_score,
+                       o.validation_score, o.priority, r.*
+                from opportunities o
+                join repos r on r.id = o.source_repo
+                where o.status in ('WATCHLIST','ANALYZED','VALIDATED','HOLD')
+                order by o.updated_at asc
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
+        result = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["topics"] = json.loads(item.get("topics") or "[]")
+            except json.JSONDecodeError:
+                item["topics"] = []
+            result.append(item)
+        return result
+
+    def latest_analysis_bundle(self, opportunity_id: int) -> dict:
+        with self.connect() as conn:
+            row = conn.execute(
+                "select raw_json from analyses where opportunity_id = ? order by id desc limit 1",
+                (opportunity_id,),
+            ).fetchone()
+        if row is None:
+            return {"analysis": {}, "pain": {}, "business": {}}
+        try:
+            return json.loads(row["raw_json"])
+        except json.JSONDecodeError:
+            return {"analysis": {}, "pain": {}, "business": {}}
+
+    def action_summary(self, opportunity_id: int) -> dict:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "select status, count(*) as n from next_actions where opportunity_id = ? group by status",
+                (opportunity_id,),
+            ).fetchall()
+        return {row["status"]: row["n"] for row in rows}
+
     def create_opportunity(self, repo_id: int, repo: dict, status: str) -> None:
         self._assert_status(status)
         with self.connect() as conn:
@@ -359,6 +429,52 @@ class Database:
                     (opportunity_id, action["action_type"], action["title"], action.get("description", ""), action.get("priority", "medium")),
                 )
 
+    def create_next_action(self, opportunity_id: int, action: dict) -> int:
+        with self.connect() as conn:
+            cur = conn.execute(
+                "insert into next_actions(opportunity_id, action_type, title, description, priority, status) values (?, ?, ?, ?, ?, 'open')",
+                (
+                    opportunity_id,
+                    action.get("action_type", "manual"),
+                    action["title"],
+                    action.get("description", ""),
+                    action.get("priority", "medium"),
+                ),
+            )
+            return int(cur.lastrowid)
+
+    def update_next_action(self, action_id: int, status: str, result_note: str | None = None) -> None:
+        if status not in {"open", "done", "closed"}:
+            raise ValueError(f"invalid action status: {status}")
+        completed_expr = "current_timestamp" if status in {"done", "closed"} else "null"
+        with self.connect() as conn:
+            conn.execute(
+                f"update next_actions set status = ?, result_note = coalesce(?, result_note), updated_at = current_timestamp, completed_at = {completed_expr} where id = ?",
+                (status, result_note, action_id),
+            )
+
+    def next_actions(self, opportunity_id: int | None = None, limit: int = 100) -> list[dict]:
+        where = ""
+        params: tuple = (limit,)
+        if opportunity_id is not None:
+            where = "where n.opportunity_id = ?"
+            params = (opportunity_id, limit)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""
+                select n.*, o.title as opportunity_title, r.full_name
+                from next_actions n
+                join opportunities o on o.id = n.opportunity_id
+                join repos r on r.id = o.source_repo
+                {where}
+                order by case n.status when 'open' then 0 when 'done' then 1 else 2 end,
+                         n.updated_at desc
+                limit ?
+                """,
+                params,
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     @staticmethod
     def _assert_status(status: str) -> None:
         if status not in VALID_STATUSES:
@@ -378,6 +494,20 @@ class Database:
         for name, column_type in columns.items():
             if name not in existing:
                 conn.execute(f"alter table validations add column {name} {column_type}")
+
+    @staticmethod
+    def _migrate_next_actions(conn: sqlite3.Connection) -> None:
+        existing = {row["name"] for row in conn.execute("pragma table_info(next_actions)").fetchall()}
+        columns = {
+            "result_note": "text",
+            "updated_at": "text",
+            "completed_at": "text",
+        }
+        for name, column_type in columns.items():
+            if name not in existing:
+                conn.execute(f"alter table next_actions add column {name} {column_type}")
+        if "updated_at" not in existing:
+            conn.execute("update next_actions set updated_at = coalesce(created_at, current_timestamp)")
 
     @staticmethod
     def _assert_founder_playbook_validation(validation: dict) -> None:

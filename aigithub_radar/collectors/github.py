@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import urllib.parse
+import urllib.error
 import urllib.request
 
 
@@ -49,8 +50,12 @@ class GitHubCollector:
 
     def _get(self, path: str) -> dict:
         req = urllib.request.Request(f"{self.api}{path}", headers=self._headers())
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"GitHub HTTP {exc.code}: {body[:500]}") from exc
 
     @staticmethod
     def _headers() -> dict[str, str]:
@@ -75,4 +80,3 @@ class GitHubCollector:
             "open_issues_count": item.get("open_issues_count", 0),
             "readme": item.get("readme", ""),
         }
-

@@ -167,6 +167,10 @@
         <div class="list" id="runList"></div>
       </section>
       <section class="panel">
+        <div class="panel-head"><h2>Next Actions</h2><button class="btn" id="addActionBtn" type="button">Add</button></div>
+        <div class="list" id="actionList"></div>
+      </section>
+      <section class="panel">
         <div class="panel-head"><h2>Recent Evidence</h2><button class="btn" id="copyBtn" type="button">Copy</button></div>
         <div class="list" id="evidenceList"></div>
       </section>
@@ -175,7 +179,7 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    const state = { summary: null, opportunities: [], latest: null, selected: null, range: 'today', view: 'radar', query: '' };
+    const state = { summary: null, opportunities: [], latest: null, actions: [], selected: null, range: 'today', view: 'radar', query: '' };
     const lanes = [
       { key: 'focus', title: 'Focus', test: o => ['APPROVED', 'NEXT_ACTION_CREATED', 'STORED'].includes(o.status) },
       { key: 'watch', title: 'Watchlist', test: o => !String(o.status || '').startsWith('REJECTED_') && !['APPROVED', 'NEXT_ACTION_CREATED', 'STORED'].includes(o.status) },
@@ -279,6 +283,7 @@
       $('detailKv').innerHTML = [
         ['Repository', `<a href="${esc(o.repo_url)}" target="_blank" rel="noreferrer">${esc(o.repo_url)}</a>`],
         ['Score', `commercial ${o.commercial_score || 0} · validation ${o.validation_score || 0}`],
+        ['Actions', `${o.open_actions || 0} open · ${o.done_actions || 0} done · ${o.closed_actions || 0} closed`],
         ['Evidence', `${Number(o.stars || 0).toLocaleString()} stars · ${Number(o.forks || 0).toLocaleString()} forks · ${esc(o.license || 'no license')}`],
         ['Stack', `${esc(o.language || 'unknown')} · ${(o.topics || []).slice(0, 8).map(esc).join(', ') || 'no topics'}`],
         ['Last Updated', esc(o.updated_at || '--')]
@@ -293,6 +298,7 @@
         ['Agentic Ops Fit', Math.max(20, Math.round(base * .86)), 'Radar can keep tracking repo, topics, issues, and status changes.']
       ];
       $('validationRows').innerHTML = rows.map(([name, value, evidence]) => `<div class="val-row"><h3>${esc(name)}</h3><div class="bar"><i style="width:${value}%"></i></div><strong>${value}</strong><p class="evidence">${esc(evidence)}</p></div>`).join('');
+      renderActions();
     }
 
     function renderRun() {
@@ -310,6 +316,20 @@
       $('evidenceList').innerHTML = events.map(e => `<div class="item"><span class="dot ${e.subject === 'github_search' ? 'blue-dot' : ''}"></span><div><strong>${esc(e.subject || e.event_type)}</strong><p class="task-meta">${esc(e.created_at)} · ${esc(summarizePayload(e.payload_json))}</p></div></div>`).join('') || '<div class="empty">No evidence events yet.</div>';
     }
 
+    function renderActions() {
+      const selectedId = state.selected?.id;
+      const rows = state.actions.filter(a => !selectedId || Number(a.opportunity_id) === Number(selectedId));
+      $('actionList').innerHTML = rows.slice(0, 12).map(a => {
+        const cls = a.status === 'done' ? 'green-dot' : a.status === 'closed' ? '' : 'blue-dot';
+        const controls = a.status === 'open'
+          ? `<div class="mini-action"><button type="button" data-action-done="${a.id}">Done</button><button type="button" data-action-close="${a.id}">Close</button></div>`
+          : '';
+        return `<div class="item"><span class="dot ${cls}"></span><div><strong>${esc(a.title)}</strong><p class="task-meta">${esc(a.status)} · ${esc(a.priority || 'medium')} · ${esc(a.full_name || '')}</p>${controls}</div></div>`;
+      }).join('') || '<div class="empty">No actions for this opportunity.</div>';
+      document.querySelectorAll('[data-action-done]').forEach(btn => btn.addEventListener('click', () => updateAction(Number(btn.dataset.actionDone), 'done')));
+      document.querySelectorAll('[data-action-close]').forEach(btn => btn.addEventListener('click', () => updateAction(Number(btn.dataset.actionClose), 'closed')));
+    }
+
     function summarizePayload(raw) {
       try {
         const data = JSON.parse(raw || '{}');
@@ -323,10 +343,11 @@
 
     async function loadData() {
       try {
-        const [summary, opps, latest] = await Promise.all([api('/api/summary'), api('/api/opportunities'), api('/api/latest-run')]);
+        const [summary, opps, latest, actions] = await Promise.all([api('/api/summary'), api('/api/opportunities'), api('/api/latest-run'), api('/api/actions')]);
         state.summary = summary;
         state.opportunities = opps.opportunities || [];
         state.latest = latest;
+        state.actions = actions.actions || [];
         if (!state.selected && state.opportunities.length) state.selected = state.opportunities.slice().sort((a, b) => score(b) - score(a))[0];
         renderSummary(); renderBoard(); renderDetail(); renderRun();
       } catch (err) {
@@ -359,6 +380,29 @@
       await navigator.clipboard.writeText(text || 'No evidence');
       showToast('Evidence copied');
     });
+    $('addActionBtn').addEventListener('click', async () => {
+      if (!state.selected) return showToast('Select an opportunity first');
+      const title = prompt('Action title');
+      if (!title) return;
+      const description = prompt('Action description') || '';
+      await postJson('/api/actions', { opportunity_id: state.selected.id, action_type: 'manual', title, description, priority: 'medium' });
+      showToast('Action created');
+      await loadData();
+    });
+
+    async function updateAction(actionId, status) {
+      const result = prompt(status === 'done' ? 'Result note' : 'Close reason') || '';
+      await postJson('/api/actions/update', { action_id: actionId, status, result_note: result });
+      showToast(`Action marked ${status}`);
+      await loadData();
+    }
+
+    async function postJson(path, payload) {
+      const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const body = await res.json();
+      if (!res.ok || body.ok === false) throw new Error(body.error || `${path} failed`);
+      return body;
+    }
 
     loadData();
     setInterval(loadData, 60000);

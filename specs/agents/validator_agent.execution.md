@@ -5,6 +5,9 @@ Define commercial validation behavior.
 ## Contract
 
 - Validate GitHub heat, demand signal, competition signal, monetization signal, Chinese market gap, packaging difficulty, license risk, and saturation.
+- For re-evaluation, compare fresh evidence against prior status and decide whether the opportunity should upgrade, remain watched, hold, or reject.
+- Treat completed action evidence as stronger than raw GitHub heat when it shows customer discovery, payment intent, or failed demand.
+- Use external market evidence from public sources only as evidence; do not assume demand from links without content signals.
 - Apply the Founder Playbook validation frame:
   - problem hypothesis: what painful workflow or business outcome is being tested;
   - customer discovery: who would be interviewed or observed, and what evidence would prove pain;

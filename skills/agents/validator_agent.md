@@ -14,6 +14,12 @@ Validate business viability using evidence.
   - reward opportunities that can turn founder attention into agentic workflows;
   - penalize broad AI-generated MVPs with security, scope, or maintenance debt.
 - Missing external demand evidence should cap score unless GitHub and buyer pain are unusually strong.
+- During re-evaluation, explicitly consider:
+  - whether GitHub evidence improved or decayed;
+  - whether external market mentions show real buyer language, competitor saturation, or only hype;
+  - whether open/done/closed next actions add proof or invalidate the opportunity.
+- Completed customer discovery or payment-test actions can raise confidence; closed actions with negative result notes should reduce confidence.
+- External market sources may include Hacker News, Reddit, Product Hunt query pages, YouTube query pages, Google Trends query pages, and X query pages. Interpret them conservatively.
 - Missing customer discovery plan should cap validation_score at 70.
 - Hype-only evidence should cap validation_score at 60.
 - No clear buyer should cap validation_score at 55.

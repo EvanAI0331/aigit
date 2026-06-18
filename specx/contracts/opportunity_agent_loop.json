@@ -30,6 +30,10 @@
     "GitHub repository metadata is collected by script before agent analysis",
     "README evidence is collected before deep repository analysis",
     "commercial validation receives explicit evidence payload before verdict",
+    "watchlist, analyzed, validated, and hold opportunities are re-evaluated with fresh repository, market, and action-state evidence",
+    "WEAK_PASS opportunities with strong enough scores create low-cost validation next actions instead of waiting for full approval",
+    "next action status changes are persisted and fed back into later validation evidence",
+    "external market evidence is collected by scripts and interpreted only by validation or business agents",
     "validator output includes Founder Playbook fields for problem hypothesis, customer discovery, competitive landscape, PMF versus hype, seven-day MVP test, agentic operations fit, and scope risk",
     "database row is written only after status transition is validated",
     "next actions are generated only after PASS or high-quality WEAK_PASS validation"
@@ -71,8 +75,18 @@
       "on_failure": "failed"
     },
     {
+      "gate_id": "watchlist_revalidation_completed",
+      "condition": "Existing WATCHLIST, ANALYZED, VALIDATED, and HOLD candidates receive fresh evidence and a validator decision in recurring ops cycles.",
+      "on_failure": "failed"
+    },
+    {
+      "gate_id": "action_feedback_recorded",
+      "condition": "Next actions can be created, marked done, or closed, and their status is available to future validator runs.",
+      "on_failure": "failed"
+    },
+    {
       "gate_id": "approval_before_next_actions",
-      "condition": "Strategist Agent runs only after validator verdict is PASS or WEAK_PASS and opportunity score reaches the approval threshold.",
+      "condition": "Strategist Agent runs after validator verdict is PASS, or after high-scoring WEAK_PASS when the next task is a low-cost validation action.",
       "on_failure": "failed"
     }
   ],
@@ -108,6 +122,6 @@
   },
   "unsupported_features": [
     "live SpecX MCP tools are not registered by the current plugin release",
-    "external Google Reddit YouTube Product Hunt X market search connectors are not implemented yet"
+    "full authenticated Product Hunt, YouTube, Google Trends, and X APIs are not configured; public query URLs are recorded as evidence until connectors are configured"
   ]
 }
