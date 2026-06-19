@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AIGitHub Radar</title>
+  <title>AIGitHub 商业雷达</title>
   <link rel="icon" href='data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" rx="14" fill="%23ff7a00"/%3E%3Ctext x="32" y="39" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="800" fill="white"%3EAG%3C/text%3E%3C/svg%3E' />
   <style>
     :root {
@@ -105,18 +105,18 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><div class="mark">AG</div><span>AIGitHub Radar</span></div>
+    <div class="brand"><div class="mark">AG</div><span>AIGitHub 商业雷达</span></div>
     <nav class="nav" id="nav">
-      <button data-view="radar" class="active">Radar</button>
-      <button data-view="opportunities">Opportunities</button>
-      <button data-view="experiments">Experiments</button>
-      <button data-view="reports">Reports</button>
+      <button data-view="radar" class="active">雷达</button>
+      <button data-view="opportunities">机会库</button>
+      <button data-view="experiments">实验</button>
+      <button data-view="reports">报告</button>
     </nav>
     <div class="actions">
-      <button class="toggle" id="autoLoopBtn" type="button"><span>Auto Loop</span><span class="switch"></span></button>
-      <button class="btn" id="todayBtn" type="button">Today</button>
-      <button class="btn" id="refreshBtn" type="button">Refresh</button>
-      <button class="btn primary" id="runBtn" type="button">Run Once</button>
+      <button class="toggle" id="autoLoopBtn" type="button"><span>自动循环</span><span class="switch"></span></button>
+      <button class="btn" id="todayBtn" type="button">今天</button>
+      <button class="btn" id="refreshBtn" type="button">刷新</button>
+      <button class="btn primary" id="runBtn" type="button">运行一次</button>
     </div>
   </header>
 
@@ -125,57 +125,57 @@
       <div class="today">
         <div class="summary hero">
           <div>
-            <div class="label">Best Current Opportunity</div>
+            <div class="label">当前最佳机会</div>
             <div class="best">
-              <div><div class="best-title" id="bestTitle">Loading...</div><p class="sub" id="bestSub">Reading live radar data</p></div>
+              <div><div class="best-title" id="bestTitle">加载中...</div><p class="sub" id="bestSub">正在读取实时雷达数据</p></div>
               <div class="score" id="bestScore">--</div>
             </div>
           </div>
           <div class="chips" id="bestChips"></div>
         </div>
-        <div class="summary"><div class="label">Total Opportunities</div><div class="metric" id="mTotal">--</div><p class="sub" id="mLatest">Latest run</p></div>
-        <div class="summary"><div class="label">Focus</div><div class="metric" id="mFocus">--</div><p class="sub">Approved or action-ready</p></div>
-        <div class="summary"><div class="label">Watchlist</div><div class="metric" id="mWatch">--</div><p class="sub">Validated or still promising</p></div>
-        <div class="summary"><div class="label">Rejected</div><div class="metric" id="mReject">--</div><p class="sub">Blocked by validation</p></div>
+        <div class="summary"><div class="label">机会总数</div><div class="metric" id="mTotal">--</div><p class="sub" id="mLatest">最近运行</p></div>
+        <div class="summary"><div class="label">重点</div><div class="metric" id="mFocus">--</div><p class="sub">已批准或已验证</p></div>
+        <div class="summary"><div class="label">观察/实验</div><div class="metric" id="mWatch">--</div><p class="sub">仍在验证推进</p></div>
+        <div class="summary"><div class="label">拒绝</div><div class="metric" id="mReject">--</div><p class="sub">验证未通过</p></div>
       </div>
 
       <section class="panel">
         <div class="panel-head">
-          <div><h1 id="boardTitle">Opportunity Board</h1><p class="sub" id="boardSub">Live agent-discovered opportunities from SQLite.</p></div>
+          <div><h1 id="boardTitle">机会看板</h1><p class="sub" id="boardSub">来自 SQLite 的实时 agent 发现结果。</p></div>
           <div class="filters">
-            <div class="seg" id="rangeSeg"><button data-range="today" class="active">Today</button><button data-range="7d">7d</button><button data-range="30d">30d</button><button data-range="all">All</button></div>
-            <input class="search" id="searchInput" placeholder="Search repos, topics, status..." />
+            <div class="seg" id="rangeSeg"><button data-range="today" class="active">今天</button><button data-range="7d">7天</button><button data-range="30d">30天</button><button data-range="all">全部</button></div>
+            <input class="search" id="searchInput" placeholder="搜索仓库、主题、状态..." />
           </div>
         </div>
         <div class="board" id="board"></div>
       </section>
 
       <section class="panel">
-        <div class="panel-head"><div><h2>Founder Playbook Validation</h2><p class="sub">Selected opportunity evidence and current validation strength.</p></div><span class="chip blue" id="selectedChip">Selected: --</span></div>
+        <div class="panel-head"><div><h2>创始人验证框架</h2><p class="sub">当前选中机会的证据和验证强度。</p></div><span class="chip blue" id="selectedChip">已选择：--</span></div>
         <div class="validation" id="validationRows"></div>
       </section>
     </section>
 
     <aside class="side">
       <section class="panel detail">
-        <div class="detail-top"><div><h2>Opportunity Card</h2><p class="sub" id="detailRepo">Source repo: --</p></div><span class="chip" id="detailStatus">--</span></div>
-        <p class="value-line" id="detailTitle">Select an opportunity.</p>
+        <div class="detail-top"><div><h2>机会卡片</h2><p class="sub" id="detailRepo">来源仓库：--</p></div><span class="chip" id="detailStatus">--</span></div>
+        <p class="value-line" id="detailTitle">请选择一个机会。</p>
         <div class="kv" id="detailKv"></div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h2>Latest Run</h2><span class="chip" id="runStatus">--</span></div>
+        <div class="panel-head"><h2>最近运行</h2><span class="chip" id="runStatus">--</span></div>
         <div class="list" id="runList"></div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h2>Ops Governance</h2><span class="chip" id="govStatus">--</span></div>
+        <div class="panel-head"><h2>Ops 治理</h2><span class="chip" id="govStatus">--</span></div>
         <div class="list" id="governanceList"></div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h2>Next Actions</h2><button class="btn" id="addActionBtn" type="button">Add</button></div>
+        <div class="panel-head"><h2>下一步行动</h2><button class="btn" id="addActionBtn" type="button">新增</button></div>
         <div class="list" id="actionList"></div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h2>Recent Evidence</h2><button class="btn" id="copyBtn" type="button">Copy</button></div>
+        <div class="panel-head"><h2>最近证据</h2><button class="btn" id="copyBtn" type="button">复制</button></div>
         <div class="list" id="evidenceList"></div>
       </section>
     </aside>
@@ -184,11 +184,29 @@
 
   <script>
     const state = { summary: null, opportunities: [], latest: null, actions: [], governance: null, selected: null, range: 'today', view: 'radar', query: '' };
-    const lanes = [
-      { key: 'focus', title: 'Focus', test: o => ['APPROVED', 'NEXT_ACTION_CREATED', 'STORED', 'ACTION_VALIDATED'].includes(o.status) },
-      { key: 'watch', title: 'Experiments', test: o => ['EXPERIMENTING', 'ACTION_PENDING', 'WATCHLIST', 'VALIDATED', 'ANALYZED', 'HOLD'].includes(o.status) },
-      { key: 'reject', title: 'Rejected', test: o => String(o.status || '').startsWith('REJECTED_') }
-    ];
+    const viewCopy = {
+      radar: { title: '机会雷达', sub: '按重点、实验、拒绝展示当前商业机会。' },
+      opportunities: { title: '机会库', sub: '按筛选、分析、验证阶段展示完整机会管线。' },
+      experiments: { title: '实验工作台', sub: '只展示正在行动、实验中或已行动验证的机会。' },
+      reports: { title: '运行报告', sub: '展示最近一次 ops 运行、治理指标、失败 query 和 dispatch 状态。' }
+    };
+    const viewLanes = {
+      radar: [
+        { title: '重点机会', test: o => ['APPROVED', 'NEXT_ACTION_CREATED', 'STORED', 'ACTION_VALIDATED'].includes(o.status) },
+        { title: '实验/观察', test: o => ['EXPERIMENTING', 'ACTION_PENDING', 'WATCHLIST', 'VALIDATED', 'ANALYZED', 'HOLD'].includes(o.status) },
+        { title: '已拒绝', test: o => String(o.status || '').startsWith('REJECTED_') }
+      ],
+      opportunities: [
+        { title: '初筛池', test: o => o.status === 'SCREENED' },
+        { title: '已分析', test: o => ['ANALYZED', 'VALIDATED', 'WATCHLIST', 'HOLD'].includes(o.status) },
+        { title: '高优先级', test: o => ['EXPERIMENTING', 'ACTION_PENDING', 'APPROVED', 'ACTION_VALIDATED', 'NEXT_ACTION_CREATED'].includes(o.status) }
+      ],
+      experiments: [
+        { title: '待行动', test: o => o.status === 'ACTION_PENDING' || Number(o.open_actions || 0) > 0 },
+        { title: '实验中', test: o => o.status === 'EXPERIMENTING' },
+        { title: '行动已验证', test: o => o.status === 'ACTION_VALIDATED' || Number(o.done_actions || 0) > 0 }
+      ]
+    };
 
     const $ = id => document.getElementById(id);
     const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -229,42 +247,78 @@
       $('mWatch').textContent = s.watchlist ?? 0;
       $('mReject').textContent = s.rejected ?? 0;
       const run = s.latest_run || {};
-      $('mLatest').textContent = run.run_name ? `${run.status} · ${localTime(run.finished_at || run.started_at)}` : 'No run yet';
+      $('mLatest').textContent = run.run_name ? `${run.status} · ${localTime(run.finished_at || run.started_at)}` : '暂无运行';
       const best = state.opportunities.slice().sort((a, b) => score(b) - score(a))[0];
       if (!best) return;
       $('bestTitle').textContent = best.full_name || best.title;
-      $('bestSub').textContent = `${best.status} · ${best.stars || 0} stars · ${best.language || 'unknown stack'}`;
+      $('bestSub').textContent = `${best.status} · ${best.stars || 0} 星标 · ${best.language || '未知技术栈'}`;
       $('bestScore').textContent = score(best);
       $('bestChips').innerHTML = [
         `<span class="chip ${chipClass(best.status)}">${esc(best.status)}</span>`,
-        `<span class="chip blue">${esc(best.license || 'no license')}</span>`,
+        `<span class="chip blue">${esc(best.license || '无许可证')}</span>`,
         `<span class="chip orange">${esc(best.updated_at || '')}</span>`
       ].join('');
       if (!state.selected) state.selected = best;
     }
 
     function renderBoard() {
+      if (state.view === 'reports') {
+        renderReportsBoard();
+        return;
+      }
       const visible = visibleOpportunities();
-      $('boardTitle').textContent = state.view === 'radar' ? 'Opportunity Board' : state.view[0].toUpperCase() + state.view.slice(1);
-      $('boardSub').textContent = `${visible.length} visible of ${state.opportunities.length} total opportunities.`;
+      const copy = viewCopy[state.view] || viewCopy.radar;
+      const lanes = viewLanes[state.view] || viewLanes.radar;
+      $('boardTitle').textContent = copy.title;
+      $('boardSub').textContent = `${copy.sub} 当前显示 ${visible.length} / ${state.opportunities.length} 个机会。`;
       $('board').innerHTML = lanes.map(lane => {
-        let items = visible.filter(lane.test);
-        if (state.view === 'opportunities') items = items.filter(o => score(o) > 0);
-        if (state.view === 'experiments') items = items.filter(o => ['EXPERIMENTING', 'ACTION_PENDING', 'ACTION_VALIDATED', 'WATCHLIST', 'VALIDATED', 'ANALYZED'].includes(o.status));
-        if (state.view === 'reports') items = items.slice(0, 12);
-        const cards = items.slice(0, 18).map(renderCard).join('') || `<div class="empty">No records in this lane.</div>`;
+        const items = visible.filter(lane.test);
+        const cards = items.slice(0, 18).map(renderCard).join('') || `<div class="empty">这个分组暂无记录。</div>`;
         return `<div class="lane"><div class="lane-head"><h2>${lane.title}</h2><span class="count">${items.length}</span></div>${cards}</div>`;
       }).join('');
       document.querySelectorAll('[data-open-id]').forEach(btn => btn.addEventListener('click', () => selectOpportunity(Number(btn.dataset.openId))));
+    }
+
+    function renderReportsBoard() {
+      const latest = state.latest || {};
+      const run = latest.run || {};
+      const events = latest.events || [];
+      const g = state.governance || {};
+      const llm = g.llm || {};
+      const rate = g.github_rate_limit || {};
+      const fails = g.failed_queries || [];
+      const dispatches = g.dispatches || [];
+      $('boardTitle').textContent = viewCopy.reports.title;
+      $('boardSub').textContent = viewCopy.reports.sub;
+      const runCards = [
+        reportItem('运行状态', run.status || '--', `${run.run_name || '未命名'} · ${localTime(run.started_at)} -> ${localTime(run.finished_at)}`),
+        reportItem('Agent 调用', `${llm.calls || 0} 次`, `平均 ${llm.avg_duration_ms || 0} ms · 超时 ${llm.timeouts || 0}`),
+        reportItem('成本', llm.estimated_cost ?? '未估算', llm.cost_note || '未记录 token/pricing，拒绝伪造成本')
+      ].join('');
+      const govCards = [
+        reportItem('GitHub 额度', `${rate.remaining || '--'} / ${rate.limit || '--'}`, `used ${rate.used || '--'} · resource ${rate.resource || '--'}`),
+        reportItem('失败 Query', `${fails.length} 条`, fails.slice(0, 3).map(f => `${f.subject || ''} ${f.query || ''}`).join(' | ') || '无'),
+        reportItem('Dispatch', `${dispatches.length} 条`, dispatches.slice(0, 3).map(d => `${d.target}:${d.status}`).join(' | ') || '暂无')
+      ].join('');
+      const evidenceCards = events.slice(0, 8).map(e => reportItem(e.subject || e.event_type, e.event_type, summarizePayload(e.payload_json))).join('') || '<div class="empty">暂无运行事件。</div>';
+      $('board').innerHTML = [
+        `<div class="lane"><div class="lane-head"><h2>运行摘要</h2><span class="count">3</span></div>${runCards}</div>`,
+        `<div class="lane"><div class="lane-head"><h2>治理指标</h2><span class="count">3</span></div>${govCards}</div>`,
+        `<div class="lane"><div class="lane-head"><h2>最近证据</h2><span class="count">${events.length}</span></div>${evidenceCards}</div>`
+      ].join('');
+    }
+
+    function reportItem(title, value, meta) {
+      return `<article class="opp"><div class="repo"><span>${esc(title)}</span><strong>${esc(value)}</strong></div><p class="path">${esc(meta || '--')}</p></article>`;
     }
 
     function renderCard(o) {
       const topics = (o.topics || []).slice(0, 3).map(t => `<span class="chip">${esc(t)}</span>`).join('');
       return `<article class="opp">
         <div class="repo"><span title="${esc(o.full_name)}">${esc(o.full_name || o.title)}</span><strong>${score(o)}</strong></div>
-        <div class="chips"><span class="chip ${chipClass(o.status)}">${esc(o.status)}</span><span class="chip blue">${esc(o.language || 'unknown')}</span>${topics}</div>
-        <p class="path">${esc(o.license || 'No license')} · ${Number(o.stars || 0).toLocaleString()} stars · updated ${esc(o.updated_at || '--')}</p>
-        <div class="mini-action"><span class="sub">${esc(o.priority || 'watch')}</span><button type="button" data-open-id="${o.id}">Open</button></div>
+        <div class="chips"><span class="chip ${chipClass(o.status)}">${esc(o.status)}</span><span class="chip blue">${esc(o.language || '未知')}</span>${topics}</div>
+        <p class="path">${esc(o.license || '无许可证')} · ${Number(o.stars || 0).toLocaleString()} 星标 · 更新 ${esc(o.updated_at || '--')}</p>
+        <div class="mini-action"><span class="sub">${esc(o.priority || '观察')}</span><button type="button" data-open-id="${o.id}">打开</button></div>
       </article>`;
     }
 
@@ -273,33 +327,33 @@
       if (!found) return;
       state.selected = found;
       renderDetail();
-      showToast(`Opened ${found.full_name || found.title}`);
+      showToast(`已打开 ${found.full_name || found.title}`);
     }
 
     function renderDetail() {
       const o = state.selected || state.opportunities[0];
       if (!o) return;
-      $('selectedChip').textContent = `Selected: ${o.full_name || o.title}`;
-      $('detailRepo').textContent = `Source repo: ${o.full_name || '--'}`;
+      $('selectedChip').textContent = `已选择：${o.full_name || o.title}`;
+      $('detailRepo').textContent = `来源仓库：${o.full_name || '--'}`;
       $('detailStatus').textContent = o.status || '--';
       $('detailStatus').className = `chip ${chipClass(o.status)}`;
-      $('detailTitle').textContent = o.title || o.full_name || 'Untitled opportunity';
+      $('detailTitle').textContent = o.title || o.full_name || '未命名机会';
       $('detailKv').innerHTML = [
-        ['Repository', `<a href="${esc(o.repo_url)}" target="_blank" rel="noreferrer">${esc(o.repo_url)}</a>`],
-        ['Score', `commercial ${o.commercial_score || 0} · validation ${o.validation_score || 0}`],
-        ['Actions', `${o.open_actions || 0} open · ${o.done_actions || 0} done · ${o.closed_actions || 0} closed`],
-        ['Evidence', `${Number(o.stars || 0).toLocaleString()} stars · ${Number(o.forks || 0).toLocaleString()} forks · ${esc(o.license || 'no license')}`],
-        ['Stack', `${esc(o.language || 'unknown')} · ${(o.topics || []).slice(0, 8).map(esc).join(', ') || 'no topics'}`],
-        ['Last Updated', esc(o.updated_at || '--')]
+        ['仓库', `<a href="${esc(o.repo_url)}" target="_blank" rel="noreferrer">${esc(o.repo_url)}</a>`],
+        ['评分', `商业 ${o.commercial_score || 0} · 验证 ${o.validation_score || 0}`],
+        ['行动', `${o.open_actions || 0} open · ${o.done_actions || 0} done · ${o.closed_actions || 0} closed`],
+        ['证据', `${Number(o.stars || 0).toLocaleString()} 星标 · ${Number(o.forks || 0).toLocaleString()} fork · ${esc(o.license || '无许可证')}`],
+        ['技术栈', `${esc(o.language || '未知')} · ${(o.topics || []).slice(0, 8).map(esc).join(', ') || '无主题'}`],
+        ['最近更新', esc(o.updated_at || '--')]
       ].map(([k, v]) => `<div><label>${k}</label><p>${v}</p></div>`).join('');
       const base = Math.min(100, Math.max(0, score(o)));
       const rows = [
-        ['Problem Hypothesis', base, `${o.status} opportunity with repo heat evidence.`],
-        ['Customer Discovery', Math.max(15, o.validation_score || Math.round(base * .7)), 'Needs buyer interviews before build commitment.'],
-        ['Competition Map', Math.max(20, Math.round(base * .82)), `${o.language || 'Unknown'} ecosystem and adjacent alternatives need review.`],
-        ['PMF vs Hype', Math.max(10, Math.round(base * .74)), `${Number(o.stars || 0).toLocaleString()} stars are signal, not payment proof.`],
-        ['7-Day MVP', Math.max(20, Math.round(base * .78)), 'Landing page plus concierge test is the next validation unit.'],
-        ['Agentic Ops Fit', Math.max(20, Math.round(base * .86)), 'Radar can keep tracking repo, topics, issues, and status changes.']
+        ['问题假设', base, `${o.status} 机会，具备仓库热度证据。`],
+        ['客户发现', Math.max(15, o.validation_score || Math.round(base * .7)), '构建前仍需要买家访谈或真实使用证据。'],
+        ['竞争地图', Math.max(20, Math.round(base * .82)), `${o.language || '未知'} 生态和替代方案需要继续审查。`],
+        ['PMF vs 热度', Math.max(10, Math.round(base * .74)), `${Number(o.stars || 0).toLocaleString()} 星标是信号，不是付款证明。`],
+        ['7 天 MVP', Math.max(20, Math.round(base * .78)), '下一验证单元应是落地页、访谈或 concierge test。'],
+        ['Agent Ops 适配', Math.max(20, Math.round(base * .86)), '雷达可持续跟踪仓库、主题、issue 和状态变化。']
       ];
       $('validationRows').innerHTML = rows.map(([name, value, evidence]) => `<div class="val-row"><h3>${esc(name)}</h3><div class="bar"><i style="width:${value}%"></i></div><strong>${value}</strong><p class="evidence">${esc(evidence)}</p></div>`).join('');
       renderActions();
@@ -312,12 +366,12 @@
       $('runStatus').className = `chip ${run.status === 'SUCCEEDED' ? 'green' : run.status === 'FAILED' ? 'red' : 'orange'}`;
       const inv = latest.agent_invocations || [];
       $('runList').innerHTML = [
-        `<div class="item"><span class="dot blue-dot"></span><div><strong>${esc(run.run_name || 'No run')}</strong><p class="task-meta">${esc(run.status || '--')} · ${localTime(run.started_at)} -> ${localTime(run.finished_at)}</p></div></div>`,
-        `<div class="item"><span class="dot green-dot"></span><div><strong>${inv.filter(x => x.status === 'SUCCEEDED').length} agent calls succeeded</strong><p class="task-meta">${inv.length} total agent invocations in latest run</p></div></div>`,
-        run.error ? `<div class="item"><span class="dot"></span><div><strong>Run error</strong><p class="task-meta">${esc(run.error)}</p></div></div>` : ''
+        `<div class="item"><span class="dot blue-dot"></span><div><strong>${esc(run.run_name || '暂无运行')}</strong><p class="task-meta">${esc(run.status || '--')} · ${localTime(run.started_at)} -> ${localTime(run.finished_at)}</p></div></div>`,
+        `<div class="item"><span class="dot green-dot"></span><div><strong>${inv.filter(x => x.status === 'SUCCEEDED').length} 次 agent 调用成功</strong><p class="task-meta">最近运行共 ${inv.length} 次 agent 调用</p></div></div>`,
+        run.error ? `<div class="item"><span class="dot"></span><div><strong>运行错误</strong><p class="task-meta">${esc(run.error)}</p></div></div>` : ''
       ].join('');
       const events = (latest.events || []).slice(0, 8);
-      $('evidenceList').innerHTML = events.map(e => `<div class="item"><span class="dot ${e.subject === 'github_search' ? 'blue-dot' : ''}"></span><div><strong>${esc(e.subject || e.event_type)}</strong><p class="task-meta">${esc(e.created_at)} · ${esc(summarizePayload(e.payload_json))}</p></div></div>`).join('') || '<div class="empty">No evidence events yet.</div>';
+      $('evidenceList').innerHTML = events.map(e => `<div class="item"><span class="dot ${e.subject === 'github_search' ? 'blue-dot' : ''}"></span><div><strong>${esc(e.subject || e.event_type)}</strong><p class="task-meta">${esc(e.created_at)} · ${esc(summarizePayload(e.payload_json))}</p></div></div>`).join('') || '<div class="empty">暂无证据事件。</div>';
       renderGovernance();
     }
 
@@ -327,13 +381,13 @@
       const llm = g.llm || {};
       const fails = g.failed_queries || [];
       const dispatches = g.dispatches || [];
-      $('govStatus').textContent = fails.length ? `${fails.length} failures` : 'ok';
+      $('govStatus').textContent = fails.length ? `${fails.length} 个失败` : '正常';
       $('govStatus').className = `chip ${fails.length ? 'orange' : 'green'}`;
       $('governanceList').innerHTML = [
-        `<div class="item"><span class="dot blue-dot"></span><div><strong>GitHub rate limit</strong><p class="task-meta">remaining ${esc(rate.remaining || '--')} / ${esc(rate.limit || '--')} · used ${esc(rate.used || '--')}</p></div></div>`,
-        `<div class="item"><span class="dot green-dot"></span><div><strong>LLM calls</strong><p class="task-meta">${esc(llm.calls || 0)} calls · avg ${esc(llm.avg_duration_ms || 0)} ms · timeouts ${esc(llm.timeouts || 0)} · cost ${esc(llm.estimated_cost ?? 'not estimated')}</p></div></div>`,
-        `<div class="item"><span class="dot"></span><div><strong>Failed queries</strong><p class="task-meta">${fails.slice(0, 3).map(f => `${f.subject || ''} ${f.query || ''}`).join(' | ') || 'none'}</p></div></div>`,
-        `<div class="item"><span class="dot blue-dot"></span><div><strong>Dispatch</strong><p class="task-meta">${dispatches.slice(0, 3).map(d => `${d.target}:${d.status}`).join(' | ') || 'none yet'}</p></div></div>`
+        `<div class="item"><span class="dot blue-dot"></span><div><strong>GitHub 额度</strong><p class="task-meta">剩余 ${esc(rate.remaining || '--')} / ${esc(rate.limit || '--')} · 已用 ${esc(rate.used || '--')}</p></div></div>`,
+        `<div class="item"><span class="dot green-dot"></span><div><strong>LLM 调用</strong><p class="task-meta">${esc(llm.calls || 0)} 次 · 平均 ${esc(llm.avg_duration_ms || 0)} ms · 超时 ${esc(llm.timeouts || 0)} · 成本 ${esc(llm.estimated_cost ?? '未估算')}</p></div></div>`,
+        `<div class="item"><span class="dot"></span><div><strong>失败 Query</strong><p class="task-meta">${fails.slice(0, 3).map(f => `${f.subject || ''} ${f.query || ''}`).join(' | ') || '无'}</p></div></div>`,
+        `<div class="item"><span class="dot blue-dot"></span><div><strong>通知派发</strong><p class="task-meta">${dispatches.slice(0, 3).map(d => `${d.target}:${d.status}`).join(' | ') || '暂无'}</p></div></div>`
       ].join('');
     }
 
@@ -343,13 +397,13 @@
       $('actionList').innerHTML = rows.slice(0, 12).map(a => {
         const cls = a.status === 'done' ? 'green-dot' : a.status === 'closed' ? '' : 'blue-dot';
         const controls = a.status === 'open'
-          ? `<div class="mini-action"><button type="button" data-action-done="${a.id}">Done</button><button type="button" data-action-close="${a.id}">Close</button></div>`
+          ? `<div class="mini-action"><button type="button" data-action-done="${a.id}">完成</button><button type="button" data-action-close="${a.id}">关闭</button></div>`
           : '';
-        const due = a.due_at ? ` · due ${esc(a.due_at)}` : '';
-        const evidence = a.evidence_required ? `<p class="task-meta">Evidence: ${esc(a.evidence_required)}</p>` : '';
-        const result = a.result_note ? `<p class="task-meta">Result: ${esc(a.result_note)} · type ${esc(a.evidence_type || 'other')} · strength ${esc(a.signal_strength || 0)} · customers ${esc(a.customer_count || 0)} · payment ${esc(a.payment_signal || 'none')}${a.negative_reason ? ' · negative ' + esc(a.negative_reason) : ''}</p>` : '';
+        const due = a.due_at ? ` · 截止 ${esc(a.due_at)}` : '';
+        const evidence = a.evidence_required ? `<p class="task-meta">证据要求：${esc(a.evidence_required)}</p>` : '';
+        const result = a.result_note ? `<p class="task-meta">结果：${esc(a.result_note)} · 类型 ${esc(a.evidence_type || 'other')} · 强度 ${esc(a.signal_strength || 0)} · 客户 ${esc(a.customer_count || 0)} · 付款 ${esc(a.payment_signal || 'none')}${a.negative_reason ? ' · 负面原因 ' + esc(a.negative_reason) : ''}</p>` : '';
         return `<div class="item"><span class="dot ${cls}"></span><div><strong>${esc(a.title)}</strong><p class="task-meta">${esc(a.status)} · ${esc(a.priority || 'medium')} · ${esc(a.full_name || '')}${due}</p>${evidence}${result}${controls}</div></div>`;
-      }).join('') || '<div class="empty">No actions for this opportunity.</div>';
+      }).join('') || '<div class="empty">这个机会暂无行动。</div>';
       document.querySelectorAll('[data-action-done]').forEach(btn => btn.addEventListener('click', () => updateAction(Number(btn.dataset.actionDone), 'done')));
       document.querySelectorAll('[data-action-close]').forEach(btn => btn.addEventListener('click', () => updateAction(Number(btn.dataset.actionClose), 'closed')));
     }
@@ -376,7 +430,7 @@
         if (!state.selected && state.opportunities.length) state.selected = state.opportunities.slice().sort((a, b) => score(b) - score(a))[0];
         renderSummary(); renderBoard(); renderDetail(); renderRun();
       } catch (err) {
-        showToast(`Load failed: ${err.message}`);
+        showToast(`加载失败：${err.message}`);
       }
     }
 
@@ -394,45 +448,45 @@
       state.view = btn.dataset.view;
       document.querySelectorAll('#nav button').forEach(x => x.classList.toggle('active', x === btn));
       renderBoard();
-      showToast(`${btn.textContent} view`);
+      showToast(`已切换到${btn.textContent}`);
     });
-    $('refreshBtn').addEventListener('click', () => { showToast('Refreshing live data'); loadData(); });
+    $('refreshBtn').addEventListener('click', () => { showToast('正在刷新实时数据'); loadData(); });
     $('todayBtn').addEventListener('click', () => { state.range = 'today'; document.querySelector('[data-range="today"]').click(); });
-    $('autoLoopBtn').addEventListener('click', () => showToast('Auto Loop is managed by launchd and runs every 12 hours.'));
-    $('runBtn').addEventListener('click', () => showToast('Run Once is intentionally not exposed in the browser yet; use the CLI to avoid accidental LLM spend.'));
+    $('autoLoopBtn').addEventListener('click', () => showToast('自动循环由 launchd 管理，每 12 小时运行一次。'));
+    $('runBtn').addEventListener('click', () => showToast('为避免误触发 LLM 成本，浏览器暂不开放运行一次；请使用 CLI。'));
     $('copyBtn').addEventListener('click', async () => {
       const text = (state.latest?.events || []).slice(0, 8).map(e => `${e.created_at} ${e.subject}: ${summarizePayload(e.payload_json)}`).join('\n');
-      await navigator.clipboard.writeText(text || 'No evidence');
-      showToast('Evidence copied');
+      await navigator.clipboard.writeText(text || '暂无证据');
+      showToast('证据已复制');
     });
     $('addActionBtn').addEventListener('click', async () => {
-      if (!state.selected) return showToast('Select an opportunity first');
-      const title = prompt('Action title');
+      if (!state.selected) return showToast('请先选择一个机会');
+      const title = prompt('行动标题');
       if (!title) return;
-      const description = prompt('Action description') || '';
-      const evidenceRequired = prompt('Evidence required') || 'customer, payment, usage, or rejection evidence';
-      const dueAt = prompt('Due date YYYY-MM-DD HH:MM, optional') || null;
+      const description = prompt('行动描述') || '';
+      const evidenceRequired = prompt('需要什么证据') || '客户、付款、使用或拒绝证据';
+      const dueAt = prompt('截止时间 YYYY-MM-DD HH:MM，可空') || null;
       await postJson('/api/actions', { opportunity_id: state.selected.id, action_type: 'manual', title, description, priority: 'medium', evidence_required: evidenceRequired, due_at: dueAt });
-      showToast('Action created');
+      showToast('行动已创建');
       await loadData();
     });
 
     async function updateAction(actionId, status) {
-      const result = prompt(status === 'done' ? 'Result note' : 'Close reason') || '';
-      const evidenceType = status === 'done' ? (prompt('Evidence type: customer_interview, payment, usage, rejection, other') || 'other') : 'rejection';
-      const signalStrength = status === 'done' ? Number(prompt('Signal strength -100 to 100') || 0) : -25;
-      const customerCount = status === 'done' ? Number(prompt('Customer count reached') || 0) : 0;
-      const paymentSignal = status === 'done' ? (prompt('Payment signal: none, budget_confirmed, preorder, paid') || 'none') : 'none';
-      const negativeReason = status === 'closed' ? result : (signalStrength < 0 ? (prompt('Negative reason, optional') || '') : '');
+      const result = prompt(status === 'done' ? '结果记录' : '关闭原因') || '';
+      const evidenceType = status === 'done' ? (prompt('证据类型：customer_interview, payment, usage, rejection, other') || 'other') : 'rejection';
+      const signalStrength = status === 'done' ? Number(prompt('信号强度 -100 到 100') || 0) : -25;
+      const customerCount = status === 'done' ? Number(prompt('触达客户数') || 0) : 0;
+      const paymentSignal = status === 'done' ? (prompt('付款信号：none, budget_confirmed, preorder, paid') || 'none') : 'none';
+      const negativeReason = status === 'closed' ? result : (signalStrength < 0 ? (prompt('负面原因，可空') || '') : '');
       await postJson('/api/actions/update', { action_id: actionId, status, result_note: result, evidence_type: evidenceType, signal_strength: signalStrength, customer_count: customerCount, payment_signal: paymentSignal, negative_reason: negativeReason });
-      showToast(`Action marked ${status}`);
+      showToast(`行动已标记为 ${status}`);
       await loadData();
     }
 
     async function postJson(path, payload) {
       const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = await res.json();
-      if (!res.ok || body.ok === false) throw new Error(body.error || `${path} failed`);
+      if (!res.ok || body.ok === false) throw new Error(body.error || `${path} 请求失败`);
       return body;
     }
 
