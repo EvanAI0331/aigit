@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import subprocess
+import sys
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -100,6 +103,24 @@ class RadarHandler(BaseHTTPRequestHandler):
                 )
                 self._json({"ok": True})
                 return
+            if path == "/api/run-once":
+                with self.db.connect() as conn:
+                    running = conn.execute("select id, run_name, started_at from runs where status = 'RUNNING' order by id desc limit 1").fetchone()
+                if running:
+                    self._json({"ok": False, "error": f"已有运行中的 ops run #{running['id']}，不启动并发运行"}, status=409)
+                    return
+                stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                log_path = ROOT / "logs" / f"manual-run-{stamp}.log"
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                log = log_path.open("ab")
+                proc = subprocess.Popen(
+                    [sys.executable, "-m", "aigithub_radar.cli", "run-once"],
+                    cwd=str(ROOT),
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                )
+                self._json({"ok": True, "pid": proc.pid, "log": str(log_path.relative_to(ROOT))})
+                return
         except Exception as exc:
             self._json({"ok": False, "error": str(exc)}, status=400)
             return
@@ -135,11 +156,21 @@ class RadarHandler(BaseHTTPRequestHandler):
                 select o.id, o.title, o.repo_url, o.status, o.commercial_score,
                        o.validation_score, o.priority, o.updated_at,
                        r.full_name, r.stars, r.forks, r.license, r.language, r.topics,
+                       a.problem, a.target_users, a.user_pain, a.why_hard_to_use,
+                       a.missing_middle_tool, a.localization_opportunity,
+                       a.template_opportunity, a.service_opportunity, a.saas_opportunity,
+                       a.raw_json as analysis_raw_json,
+                       v.problem_hypothesis, v.customer_discovery_plan, v.demand_signal,
+                       v.competition_signal, v.monetization_signal, v.pmf_vs_hype_check,
+                       v.seven_day_mvp_test, v.agentic_ops_fit, v.security_scope_risk,
+                       v.license_check, v.saturation_check, v.verdict, v.reason as validation_reason,
                        sum(case when n.status = 'open' then 1 else 0 end) as open_actions,
                        sum(case when n.status = 'done' then 1 else 0 end) as done_actions,
                        sum(case when n.status = 'closed' then 1 else 0 end) as closed_actions
                 from opportunities o
                 join repos r on r.id = o.source_repo
+                left join analyses a on a.id = (select max(id) from analyses where opportunity_id = o.id)
+                left join validations v on v.id = (select max(id) from validations where opportunity_id = o.id)
                 left join next_actions n on n.opportunity_id = o.id
                 group by o.id
                 order by o.commercial_score desc, o.updated_at desc

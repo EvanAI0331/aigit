@@ -78,6 +78,9 @@
     .kv div { display: grid; gap: 4px; }
     .kv label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .055em; }
     .kv p { color: #344054; font-size: 14px; overflow-wrap: anywhere; }
+    .business-block { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); display: grid; gap: 12px; }
+    .business-block h3 { font-size: 14px; }
+    .business-block p { color: #344054; font-size: 13px; overflow-wrap: anywhere; }
     .list { display: grid; gap: 10px; padding: 14px 18px 18px; }
     .item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
     .item:last-child { border-bottom: 0; }
@@ -296,9 +299,9 @@
         reportItem('成本', llm.estimated_cost ?? '未估算', llm.cost_note || '未记录 token/pricing，拒绝伪造成本')
       ].join('');
       const govCards = [
-        reportItem('GitHub 额度', `${rate.remaining || '--'} / ${rate.limit || '--'}`, `used ${rate.used || '--'} · resource ${rate.resource || '--'}`),
+        reportItem('GitHub 额度', `${rate.remaining || '--'} / ${rate.limit || '--'}`, `已用 ${rate.used || '--'} · 资源 ${rate.resource || '--'}`),
         reportItem('失败 Query', `${fails.length} 条`, fails.slice(0, 3).map(f => `${f.subject || ''} ${f.query || ''}`).join(' | ') || '无'),
-        reportItem('Dispatch', `${dispatches.length} 条`, dispatches.slice(0, 3).map(d => `${d.target}:${d.status}`).join(' | ') || '暂无')
+        reportItem('通知派发', `${dispatches.length} 条`, dispatches.slice(0, 3).map(d => `${d.target}:${d.status}`).join(' | ') || '暂无')
       ].join('');
       const evidenceCards = events.slice(0, 8).map(e => reportItem(e.subject || e.event_type, e.event_type, summarizePayload(e.payload_json))).join('') || '<div class="empty">暂无运行事件。</div>';
       $('board').innerHTML = [
@@ -338,6 +341,7 @@
       $('detailStatus').textContent = o.status || '--';
       $('detailStatus').className = `chip ${chipClass(o.status)}`;
       $('detailTitle').textContent = o.title || o.full_name || '未命名机会';
+      const business = businessPlan(o);
       $('detailKv').innerHTML = [
         ['仓库', `<a href="${esc(o.repo_url)}" target="_blank" rel="noreferrer">${esc(o.repo_url)}</a>`],
         ['评分', `商业 ${o.commercial_score || 0} · 验证 ${o.validation_score || 0}`],
@@ -345,18 +349,44 @@
         ['证据', `${Number(o.stars || 0).toLocaleString()} 星标 · ${Number(o.forks || 0).toLocaleString()} fork · ${esc(o.license || '无许可证')}`],
         ['技术栈', `${esc(o.language || '未知')} · ${(o.topics || []).slice(0, 8).map(esc).join(', ') || '无主题'}`],
         ['最近更新', esc(o.updated_at || '--')]
-      ].map(([k, v]) => `<div><label>${k}</label><p>${v}</p></div>`).join('');
-      const base = Math.min(100, Math.max(0, score(o)));
-      const rows = [
-        ['问题假设', base, `${o.status} 机会，具备仓库热度证据。`],
-        ['客户发现', Math.max(15, o.validation_score || Math.round(base * .7)), '构建前仍需要买家访谈或真实使用证据。'],
-        ['竞争地图', Math.max(20, Math.round(base * .82)), `${o.language || '未知'} 生态和替代方案需要继续审查。`],
-        ['PMF vs 热度', Math.max(10, Math.round(base * .74)), `${Number(o.stars || 0).toLocaleString()} 星标是信号，不是付款证明。`],
-        ['7 天 MVP', Math.max(20, Math.round(base * .78)), '下一验证单元应是落地页、访谈或 concierge test。'],
-        ['Agent Ops 适配', Math.max(20, Math.round(base * .86)), '雷达可持续跟踪仓库、主题、issue 和状态变化。']
-      ];
-      $('validationRows').innerHTML = rows.map(([name, value, evidence]) => `<div class="val-row"><h3>${esc(name)}</h3><div class="bar"><i style="width:${value}%"></i></div><strong>${value}</strong><p class="evidence">${esc(evidence)}</p></div>`).join('');
+      ].map(([k, v]) => `<div><label>${k}</label><p>${v}</p></div>`).join('') + business;
+      const rows = validationRows(o);
+      $('validationRows').innerHTML = rows.map(([name, value, evidence]) => `<div class="val-row"><h3>${esc(name)}</h3><div class="bar"><i style="width:${value}%"></i></div><strong>${value}</strong><p class="evidence">${esc(evidence || '暂无真实验证字段')}</p></div>`).join('');
       renderActions();
+    }
+
+    function businessPlan(o) {
+      const parsed = safeJson(o.analysis_raw_json);
+      const business = parsed.business || {};
+      const bestPath = Array.isArray(business.best_path) ? business.best_path.join(' / ') : '';
+      const rows = [
+        ['推荐路径', bestPath],
+        ['MVP 形态', business.mvp_form],
+        ['预估定价', business.estimated_price],
+        ['模板包机会', o.template_opportunity],
+        ['服务机会', o.service_opportunity],
+        ['SaaS 机会', o.saas_opportunity]
+      ].filter(([, v]) => v);
+      if (!rows.length) {
+        return '<div class="business-block"><h3>商业变现方案</h3><p>该机会尚未完成 business_designer 分析，暂无真实变现方案。</p></div>';
+      }
+      return `<div class="business-block"><h3>商业变现方案</h3>${rows.map(([k, v]) => `<div><label>${esc(k)}</label><p>${esc(v)}</p></div>`).join('')}</div>`;
+    }
+
+    function validationRows(o) {
+      const value = Math.max(0, Math.min(100, Number(o.validation_score || 0)));
+      return [
+        ['问题假设', value, o.problem_hypothesis || o.problem],
+        ['客户发现', value, o.customer_discovery_plan || o.target_users],
+        ['需求信号', value, o.demand_signal || o.user_pain],
+        ['竞争地图', value, o.competition_signal],
+        ['变现信号', value, o.monetization_signal],
+        ['PMF vs 热度', value, o.pmf_vs_hype_check],
+        ['7 天 MVP', value, o.seven_day_mvp_test],
+        ['Agent Ops 适配', value, o.agentic_ops_fit],
+        ['范围/安全风险', value, o.security_scope_risk || o.license_check || o.saturation_check],
+        ['验证结论', value, [o.verdict, o.validation_reason].filter(Boolean).join(' · ')]
+      ].filter(([, , evidence]) => evidence);
     }
 
     function renderRun() {
@@ -419,6 +449,15 @@
       }
     }
 
+    function safeJson(raw) {
+      try {
+        const parsed = JSON.parse(raw || '{}');
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+
     async function loadData() {
       try {
         const [summary, opps, latest, actions, governance] = await Promise.all([api('/api/summary'), api('/api/opportunities'), api('/api/latest-run'), api('/api/actions'), api('/api/governance')]);
@@ -453,7 +492,16 @@
     $('refreshBtn').addEventListener('click', () => { showToast('正在刷新实时数据'); loadData(); });
     $('todayBtn').addEventListener('click', () => { state.range = 'today'; document.querySelector('[data-range="today"]').click(); });
     $('autoLoopBtn').addEventListener('click', () => showToast('自动循环由 launchd 管理，每 12 小时运行一次。'));
-    $('runBtn').addEventListener('click', () => showToast('为避免误触发 LLM 成本，浏览器暂不开放运行一次；请使用 CLI。'));
+    $('runBtn').addEventListener('click', async () => {
+      if (!confirm('这会真实启动一次 ops loop，并产生 LLM/API 调用。确认运行？')) return;
+      try {
+        const result = await postJson('/api/run-once', {});
+        showToast(`已启动真实运行：pid ${result.pid}，日志 ${result.log}`);
+        await loadData();
+      } catch (err) {
+        showToast(`启动失败：${err.message}`);
+      }
+    });
     $('copyBtn').addEventListener('click', async () => {
       const text = (state.latest?.events || []).slice(0, 8).map(e => `${e.created_at} ${e.subject}: ${summarizePayload(e.payload_json)}`).join('\n');
       await navigator.clipboard.writeText(text || '暂无证据');
