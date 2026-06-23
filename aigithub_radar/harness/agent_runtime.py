@@ -30,7 +30,7 @@ class AgentRuntime:
         user = json.dumps(payload, ensure_ascii=False, indent=2)
         started = time.monotonic()
         try:
-            result = self.llms.get(agent, self.default_llm).complete_json(system=system, user=user)
+            result = self.llms.get(agent, self.default_llm).complete_json(system=system, user=user, response_schema=self._response_schema(agent))
             if not isinstance(result, dict):
                 raise RuntimeError(f"{agent} returned non-object JSON")
             self._assert_output_contract(agent, result)
@@ -66,3 +66,48 @@ class AgentRuntime:
             raise RuntimeError(f"{agent} missing required output fields: {', '.join(missing)}")
         if agent == "validator_agent" and result.get("verdict") == "REJECT" and not result.get("reject_status"):
             raise RuntimeError("validator_agent must return reject_status when verdict is REJECT")
+
+    @staticmethod
+    def _response_schema(agent: str) -> dict | None:
+        required = AGENT_REQUIRED_OUTPUT_FIELDS.get(agent)
+        if not required:
+            return None
+        array_fields = {
+            "selected_themes",
+            "gate_sequence",
+            "evidence_requirements",
+            "best_path",
+            "not_recommended",
+            "evidence_notes",
+            "search_queries",
+            "next_actions",
+        }
+        integer_fields = {
+            "repos_per_theme",
+            "deep_limit",
+            "validate_limit",
+            "pain_strength",
+            "judgment_score",
+            "validation_score",
+            "founder_playbook_score",
+        }
+        properties: dict[str, dict] = {}
+        schema_required = list(required)
+        if agent == "validator_agent" and "reject_status" not in schema_required:
+            schema_required.append("reject_status")
+        for field in schema_required:
+            if field in array_fields:
+                properties[field] = {"type": "array", "items": {"type": "string"}}
+            elif field in integer_fields:
+                properties[field] = {"type": "integer"}
+            else:
+                properties[field] = {"type": "string"}
+        return {
+            "name": f"{agent}_output",
+            "schema": {
+                "type": "object",
+                "properties": properties,
+                "required": schema_required,
+                "additionalProperties": False,
+            },
+        }

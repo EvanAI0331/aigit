@@ -9,7 +9,7 @@ import urllib.request
 
 
 class LLMClient:
-    def complete_json(self, system: str, user: str) -> dict:
+    def complete_json(self, system: str, user: str, response_schema: dict | None = None) -> dict:
         raise NotImplementedError
 
 
@@ -38,7 +38,7 @@ class OpenAICompatibleChatClient(LLMClient):
             raise RuntimeError(f"{model_env} is required for agent execution; no fallback is allowed")
         self.extra_body = extra_body or {}
 
-    def complete_json(self, system: str, user: str) -> dict:
+    def complete_json(self, system: str, user: str, response_schema: dict | None = None) -> dict:
         body = {
             "model": self.model,
             "messages": [
@@ -97,12 +97,20 @@ class OpenAIResponsesClient(LLMClient):
         disable_storage = os.environ.get(disable_storage_env, "false").lower() in {"1", "true", "yes"}
         self.store = False if disable_storage else os.environ.get(store_env, "false").lower() in {"1", "true", "yes"}
 
-    def complete_json(self, system: str, user: str) -> dict:
+    def complete_json(self, system: str, user: str, response_schema: dict | None = None) -> dict:
+        text_format = {"type": "json_object"}
+        if response_schema is not None:
+            text_format = {
+                "type": "json_schema",
+                "name": response_schema.get("name", "agent_output"),
+                "schema": response_schema["schema"],
+                "strict": True,
+            }
         body = {
             "model": self.model,
             "instructions": system,
             "input": [{"role": "user", "content": user}],
-            "text": {"format": {"type": "json_object"}},
+            "text": {"format": text_format},
             "reasoning": {"effort": self.reasoning_effort},
             "store": self.store,
             "max_output_tokens": 4000,
