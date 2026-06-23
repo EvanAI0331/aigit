@@ -7,7 +7,7 @@ from aigithub_radar.collectors.market import MarketEvidenceCollector
 from aigithub_radar.dispatch import DispatchManager
 from aigithub_radar.harness.agent_runtime import AgentRuntime
 from aigithub_radar.harness.contracts import APPROVAL_THRESHOLD, LoopSummary
-from aigithub_radar.harness.llm import OrchestratorLLMClient, WorkerLLMClient, load_env_file
+from aigithub_radar.harness.llm import GPTAgentLLMClient, OrchestratorLLMClient, WorkerLLMClient, load_env_file
 from aigithub_radar.harness.scoring import fact_score, opportunity_score
 from aigithub_radar.harness.spec_compiler import SpecCompiler
 from aigithub_radar.harness.specx_adapter import SpecXAdapter
@@ -26,9 +26,16 @@ class OpportunityLoop:
         self.dispatcher = DispatchManager(self.db)
         orchestrator_llm = OrchestratorLLMClient()
         worker_llm = WorkerLLMClient()
+        gpt_agent_llm = GPTAgentLLMClient()
         self.runtime = AgentRuntime(
             root,
-            llms={"orchestrator_agent": orchestrator_llm, "scout_agent": orchestrator_llm},
+            llms={
+                "orchestrator_agent": gpt_agent_llm,
+                "scout_agent": orchestrator_llm,
+                "pain_finder": gpt_agent_llm,
+                "business_designer": gpt_agent_llm,
+                "validator_agent": gpt_agent_llm,
+            },
             default_llm=worker_llm,
         )
 

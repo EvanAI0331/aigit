@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from aigithub_radar.harness.loop import OpportunityLoop
-from aigithub_radar.harness.llm import OrchestratorLLMClient, WorkerLLMClient, load_env_file
+from aigithub_radar.harness.llm import GPTAgentLLMClient, OrchestratorLLMClient, WorkerLLMClient, load_env_file
 from aigithub_radar.harness.spec_compiler import SpecCompiler
 from aigithub_radar.harness.specx_adapter import SpecXAdapter
 from aigithub_radar.storage.db import Database
@@ -61,7 +61,7 @@ def main() -> None:
     if args.command == "check-llms":
         load_env_file(ROOT / ".env")
         results = {}
-        for name, client_factory in {"orchestrator": OrchestratorLLMClient, "worker": WorkerLLMClient}.items():
+        for name, client_factory in {"orchestrator": OrchestratorLLMClient, "worker": WorkerLLMClient, "gpt_agent": GPTAgentLLMClient}.items():
             try:
                 results[name] = client_factory().complete_json(
                     "Return strict JSON only. Do not include markdown.",
