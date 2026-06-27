@@ -45,29 +45,7 @@ class OpportunityLoop:
         self.db.init()
         run_id = self.db.create_run()
         try:
-            current_date = datetime.now().date().isoformat()
-            market_evidence = self.market_collector.collect_topic_signals()
-            self.db.add_event(run_id, "EVIDENCE_COLLECTED", "market_topic_signals", market_evidence)
-            market_plan = self.runtime.run(
-                "market_monitor_agent",
-                {
-                    "current_date": current_date,
-                    "market_evidence": market_evidence,
-                    "budget_caps": {
-                        "theme_limit": theme_limit,
-                        "repos_per_theme": repos_per_theme,
-                    },
-                    "constraints": {
-                        "no_static_theme_pool": True,
-                        "scripts_collect_evidence_only": True,
-                        "agent_decisions_require_llm": True,
-                    },
-                },
-                run_id=run_id,
-                db=self.db,
-            )
-            discovered_themes = self.db.save_market_themes(market_plan, market_evidence)
-            self.db.add_event(run_id, "GATE_PASSED", "market_themes_discovered", {"themes": discovered_themes, "monitor": market_plan})
+            market_plan = self._refresh_market_themes(run_id, theme_limit, repos_per_theme)
             available_themes = self.db.next_themes(theme_limit)
             plan = self.runtime.run(
                 "orchestrator_agent",
@@ -155,6 +133,44 @@ class OpportunityLoop:
             self.db.add_event(run_id, "RUN_FAILED", None, {"error": str(exc)})
             self.db.finish_run(run_id, "FAILED", str(exc))
             raise
+
+    def run_market_monitor(self, theme_limit: int = 8, repos_per_theme: int = 20) -> dict:
+        self.db.init()
+        run_id = self.db.create_run("market-monitor-hourly")
+        try:
+            market_plan = self._refresh_market_themes(run_id, theme_limit, repos_per_theme)
+            self.db.finish_run(run_id, "SUCCEEDED")
+            return market_plan
+        except Exception as exc:
+            self.db.add_event(run_id, "RUN_FAILED", None, {"error": str(exc)})
+            self.db.finish_run(run_id, "FAILED", str(exc))
+            raise
+
+    def _refresh_market_themes(self, run_id: int, theme_limit: int, repos_per_theme: int) -> dict:
+        current_date = datetime.now().date().isoformat()
+        market_evidence = self.market_collector.collect_topic_signals()
+        self.db.add_event(run_id, "EVIDENCE_COLLECTED", "market_topic_signals", market_evidence)
+        market_plan = self.runtime.run(
+            "market_monitor_agent",
+            {
+                "current_date": current_date,
+                "market_evidence": market_evidence,
+                "budget_caps": {
+                    "theme_limit": theme_limit,
+                    "repos_per_theme": repos_per_theme,
+                },
+                "constraints": {
+                    "no_static_theme_pool": True,
+                    "scripts_collect_evidence_only": True,
+                    "agent_decisions_require_llm": True,
+                },
+            },
+            run_id=run_id,
+            db=self.db,
+        )
+        discovered_themes = self.db.save_market_themes(market_plan, market_evidence)
+        self.db.add_event(run_id, "GATE_PASSED", "market_themes_discovered", {"themes": discovered_themes, "monitor": market_plan})
+        return market_plan
 
     @staticmethod
     def _bounded_int(value: object, cap: int, minimum: int) -> int:

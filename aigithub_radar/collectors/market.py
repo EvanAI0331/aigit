@@ -7,9 +7,14 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 
+from aigithub_radar.collectors.agent_reach import AgentReachEvidenceCollector
+
 
 class MarketEvidenceCollector:
     """Evidence-only public market signal collector."""
+
+    def __init__(self) -> None:
+        self.agent_reach = AgentReachEvidenceCollector()
 
     def collect_topic_signals(self) -> dict:
         """Collect public market signals for theme discovery.
@@ -30,6 +35,7 @@ class MarketEvidenceCollector:
                 "google_trends": trends,
                 "youtube": self._youtube_queries(youtube_queries),
                 "x": self._x_queries(trend_titles[:5]),
+                "agent_reach": self.agent_reach.collect(),
             },
             "note": "Evidence-only market monitoring. market_monitor_agent selects themes; scripts must not decide opportunity themes.",
         }

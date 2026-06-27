@@ -31,6 +31,10 @@ def main() -> None:
     run_once.add_argument("--deep-limit", type=int, default=2)
     run_once.add_argument("--validate-limit", type=int, default=1)
 
+    monitor_once = sub.add_parser("market-monitor-once")
+    monitor_once.add_argument("--theme-limit", type=int, default=8)
+    monitor_once.add_argument("--repos-per-theme", type=int, default=20)
+
     ops_loop = sub.add_parser("ops-loop")
     ops_loop.add_argument("--interval-hours", type=float, default=12)
     ops_loop.add_argument("--theme-limit", type=int, default=3)
@@ -38,6 +42,12 @@ def main() -> None:
     ops_loop.add_argument("--deep-limit", type=int, default=2)
     ops_loop.add_argument("--validate-limit", type=int, default=1)
     ops_loop.add_argument("--no-immediate", action="store_true")
+
+    monitor_loop = sub.add_parser("market-monitor-loop")
+    monitor_loop.add_argument("--interval-hours", type=float, default=1)
+    monitor_loop.add_argument("--theme-limit", type=int, default=8)
+    monitor_loop.add_argument("--repos-per-theme", type=int, default=20)
+    monitor_loop.add_argument("--no-immediate", action="store_true")
 
     sub.add_parser("report-today")
     sub.add_parser("latest-run")
@@ -85,6 +95,14 @@ def main() -> None:
         print(summary.to_text())
         return
 
+    if args.command == "market-monitor-once":
+        loop = OpportunityLoop(ROOT, DB_PATH)
+        result = loop.run_market_monitor(theme_limit=args.theme_limit, repos_per_theme=args.repos_per_theme)
+        import json
+
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
     if args.command == "ops-loop":
         interval_seconds = int(args.interval_hours * 60 * 60)
         if interval_seconds <= 0:
@@ -108,6 +126,26 @@ def main() -> None:
             except Exception as exc:
                 print(f"ops loop run failed: {exc}")
             print(f"next ops loop run in {args.interval_hours:g}h")
+            time.sleep(interval_seconds)
+
+    if args.command == "market-monitor-loop":
+        interval_seconds = int(args.interval_hours * 60 * 60)
+        if interval_seconds <= 0:
+            raise SystemExit("--interval-hours must be positive")
+        loop = OpportunityLoop(ROOT, DB_PATH)
+        print(f"market monitor interval: {args.interval_hours:g}h ({interval_seconds}s)")
+        if args.no_immediate:
+            print(f"first market monitor run scheduled after {args.interval_hours:g}h")
+            time.sleep(interval_seconds)
+        while True:
+            started = datetime.now().isoformat(timespec="seconds")
+            print(f"[{started}] market monitor run started")
+            try:
+                result = loop.run_market_monitor(theme_limit=args.theme_limit, repos_per_theme=args.repos_per_theme)
+                print(f"candidate themes: {', '.join(result.get('candidate_themes') or [])}")
+            except Exception as exc:
+                print(f"market monitor run failed: {exc}")
+            print(f"next market monitor run in {args.interval_hours:g}h")
             time.sleep(interval_seconds)
 
     if args.command == "report-today":

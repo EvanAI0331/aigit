@@ -46,6 +46,27 @@ def run_ops() -> None:
         time.sleep(interval_seconds)
 
 
+def run_market_monitor() -> None:
+    prepare()
+    loop = OpportunityLoop(ROOT, DB_PATH)
+    import time
+    from datetime import datetime
+
+    interval_hours = 1
+    interval_seconds = interval_hours * 60 * 60
+    print(f"market monitor interval: {interval_hours}h ({interval_seconds}s)", flush=True)
+    while True:
+        started = datetime.now().isoformat(timespec="seconds")
+        print(f"[{started}] market monitor run started", flush=True)
+        try:
+            result = loop.run_market_monitor(theme_limit=8, repos_per_theme=20)
+            print(f"candidate themes: {', '.join(result.get('candidate_themes') or [])}", flush=True)
+        except Exception as exc:
+            print(f"market monitor run failed: {exc}", flush=True)
+        print(f"next market monitor run in {interval_hours}h", flush=True)
+        time.sleep(interval_seconds)
+
+
 def main() -> None:
     command = sys.argv[1] if len(sys.argv) > 1 else ""
     if command == "web":
@@ -53,6 +74,9 @@ def main() -> None:
         return
     if command == "ops":
         run_ops()
+        return
+    if command == "monitor":
+        run_market_monitor()
         return
     raise SystemExit("usage: python -m aigithub_radar.service_entry [web|ops]")
 

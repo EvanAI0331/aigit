@@ -22,6 +22,7 @@
     "specx_contract_cli",
     "compiled_agent_specs",
     "market_signal_collector",
+    "agent_reach_platform_collector",
     "market_monitor_llm"
   ],
   "required_evidence": [
@@ -30,6 +31,8 @@
     "preconfigured static theme pools are not used as a source of opportunity themes",
     "Market Monitor Agent selects dynamic themes from collected public market evidence before Orchestrator Agent runs",
     "market demand and heat evidence is collected before theme selection",
+    "GitHub hot repository evidence is collected as platform heat before theme selection",
+    "domestic platform evidence from XiaoHongShu, Douyin, Toutiao, WeChat Channels, WeChat, Xianyu, Bilibili, and V2EX is collected or explicitly recorded as unavailable before theme selection",
     "orchestrator agent produces a run plan before Scout Agent runs",
     "skill file exists for every required agent",
     "external agency-agent skill references are compiled into each relevant agent artifact before execution",
