@@ -4,6 +4,8 @@ Specify Repo Analyst output.
 
 ## Contract
 
+All natural-language string values must be written in Simplified Chinese. Keep enum-like status tokens, repository names, technology names, license identifiers, and machine-readable identifiers unchanged.
+
 Return:
 
 ```json
@@ -18,4 +20,3 @@ Return:
   "evidence_notes": []
 }
 ```
-

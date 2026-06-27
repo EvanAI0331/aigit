@@ -4,6 +4,8 @@ Specify Orchestrator Agent output.
 
 ## Contract
 
+All natural-language string values must be written in Simplified Chinese. Keep enum-like status tokens, repository names, technology names, and machine-readable identifiers unchanged.
+
 Return:
 
 ```json
@@ -18,4 +20,3 @@ Return:
   "reason": ""
 }
 ```
-

@@ -74,6 +74,10 @@ class AgentRuntime:
             return None
         array_fields = {
             "selected_themes",
+            "candidate_themes",
+            "demand_signals",
+            "heat_signals",
+            "rejected_topics",
             "gate_sequence",
             "evidence_requirements",
             "best_path",
@@ -86,6 +90,9 @@ class AgentRuntime:
             "repos_per_theme",
             "deep_limit",
             "validate_limit",
+            "demand_score",
+            "heat_score",
+            "confidence",
             "pain_strength",
             "judgment_score",
             "validation_score",

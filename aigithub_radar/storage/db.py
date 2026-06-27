@@ -7,29 +7,6 @@ from pathlib import Path
 from aigithub_radar.harness.contracts import VALID_STATUSES
 
 
-DEFAULT_THEMES = [
-    "AI agent",
-    "workflow automation",
-    "AI video",
-    "ComfyUI",
-    "RAG",
-    "local LLM",
-    "knowledge base",
-    "browser automation",
-    "data dashboard",
-    "AI coding",
-    "n8n",
-    "low-code",
-    "AI CRM",
-    "AI sales",
-    "YouTube automation",
-    "short video automation",
-    "AI image workflow",
-    "open-source analytics",
-    "monitoring dashboard",
-]
-
-
 class Database:
     def __init__(self, path: Path):
         self.path = path
@@ -47,7 +24,15 @@ class Database:
                 create table if not exists themes (
                   theme text primary key,
                   active integer not null default 1,
-                  last_used_at text
+                  last_used_at text,
+                  source text not null default 'market_monitor',
+                  demand_score integer default 0,
+                  heat_score integer default 0,
+                  confidence integer default 0,
+                  evidence_json text,
+                  reason text,
+                  discovered_at text default current_timestamp,
+                  updated_at text default current_timestamp
                 );
                 create table if not exists runs (
                   id integer primary key,
@@ -178,8 +163,7 @@ class Database:
             self._migrate_validations(conn)
             self._migrate_next_actions(conn)
             self._migrate_agent_invocations(conn)
-            for theme in DEFAULT_THEMES:
-                conn.execute("insert or ignore into themes(theme) values (?)", (theme,))
+            self._migrate_themes(conn)
 
     def create_run(self, run_name: str | None = None) -> int:
         with self.connect() as conn:
@@ -250,11 +234,64 @@ class Database:
 
     def next_themes(self, limit: int) -> list[str]:
         with self.connect() as conn:
-            rows = conn.execute("select theme from themes where active = 1 order by coalesce(last_used_at, '') asc, theme asc limit ?", (limit,)).fetchall()
+            rows = conn.execute(
+                """
+                select theme from themes
+                where active = 1 and source = 'market_monitor'
+                order by (coalesce(demand_score, 0) + coalesce(heat_score, 0) + coalesce(confidence, 0)) desc,
+                         coalesce(last_used_at, '') asc,
+                         updated_at desc,
+                         theme asc
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
             themes = [row["theme"] for row in rows]
             for theme in themes:
                 conn.execute("update themes set last_used_at = current_timestamp where theme = ?", (theme,))
             return themes
+
+    def save_market_themes(self, monitor_output: dict, evidence: dict) -> list[str]:
+        themes = monitor_output.get("candidate_themes")
+        if not isinstance(themes, list) or not themes:
+            raise RuntimeError("market_monitor_agent must return non-empty candidate_themes")
+        demand_score = max(0, min(100, int(monitor_output.get("demand_score") or 0)))
+        heat_score = max(0, min(100, int(monitor_output.get("heat_score") or 0)))
+        confidence = max(0, min(100, int(monitor_output.get("confidence") or 0)))
+        reason = str(monitor_output.get("reason") or "")
+        evidence_json = json.dumps(
+            {
+                "monitor_output": monitor_output,
+                "market_evidence": evidence,
+            },
+            ensure_ascii=False,
+        )
+        saved: list[str] = []
+        with self.connect() as conn:
+            for raw_theme in themes:
+                theme = " ".join(str(raw_theme).strip().split())
+                if len(theme) < 3 or len(theme) > 80:
+                    continue
+                conn.execute(
+                    """
+                    insert into themes(theme, active, source, demand_score, heat_score, confidence, evidence_json, reason)
+                    values (?, 1, 'market_monitor', ?, ?, ?, ?, ?)
+                    on conflict(theme) do update set
+                      active = 1,
+                      source = 'market_monitor',
+                      demand_score = excluded.demand_score,
+                      heat_score = excluded.heat_score,
+                      confidence = excluded.confidence,
+                      evidence_json = excluded.evidence_json,
+                      reason = excluded.reason,
+                      updated_at = current_timestamp
+                    """,
+                    (theme, demand_score, heat_score, confidence, evidence_json, reason),
+                )
+                saved.append(theme)
+        if not saved:
+            raise RuntimeError("market_monitor_agent returned no valid candidate theme names")
+        return saved
 
     def upsert_repo(self, repo: dict) -> int:
         with self.connect() as conn:
@@ -689,6 +726,31 @@ class Database:
         existing = {row["name"] for row in conn.execute("pragma table_info(agent_invocations)").fetchall()}
         if "duration_ms" not in existing:
             conn.execute("alter table agent_invocations add column duration_ms integer")
+
+    @staticmethod
+    def _migrate_themes(conn: sqlite3.Connection) -> None:
+        existing = {row["name"] for row in conn.execute("pragma table_info(themes)").fetchall()}
+        columns = {
+            "source": "text not null default 'market_monitor'",
+            "demand_score": "integer default 0",
+            "heat_score": "integer default 0",
+            "confidence": "integer default 0",
+            "evidence_json": "text",
+            "reason": "text",
+            "discovered_at": "text",
+            "updated_at": "text",
+        }
+        for name, column_type in columns.items():
+            if name not in existing:
+                conn.execute(f"alter table themes add column {name} {column_type}")
+        conn.execute("update themes set discovered_at = coalesce(discovered_at, current_timestamp), updated_at = coalesce(updated_at, current_timestamp)")
+        conn.execute(
+            """
+            update themes
+            set active = 0, source = 'legacy_static', reason = '废止预置主题池后停用的旧静态主题'
+            where evidence_json is null and source = 'market_monitor'
+            """
+        )
 
     @staticmethod
     def _assert_founder_playbook_validation(validation: dict) -> None:

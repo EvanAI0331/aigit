@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from aigithub_radar.collectors.github import GitHubCollector
@@ -30,6 +31,7 @@ class OpportunityLoop:
         self.runtime = AgentRuntime(
             root,
             llms={
+                "market_monitor_agent": gpt_agent_llm,
                 "orchestrator_agent": gpt_agent_llm,
                 "scout_agent": orchestrator_llm,
                 "pain_finder": gpt_agent_llm,
@@ -43,11 +45,36 @@ class OpportunityLoop:
         self.db.init()
         run_id = self.db.create_run()
         try:
+            current_date = datetime.now().date().isoformat()
+            market_evidence = self.market_collector.collect_topic_signals()
+            self.db.add_event(run_id, "EVIDENCE_COLLECTED", "market_topic_signals", market_evidence)
+            market_plan = self.runtime.run(
+                "market_monitor_agent",
+                {
+                    "current_date": current_date,
+                    "market_evidence": market_evidence,
+                    "budget_caps": {
+                        "theme_limit": theme_limit,
+                        "repos_per_theme": repos_per_theme,
+                    },
+                    "constraints": {
+                        "no_static_theme_pool": True,
+                        "scripts_collect_evidence_only": True,
+                        "agent_decisions_require_llm": True,
+                    },
+                },
+                run_id=run_id,
+                db=self.db,
+            )
+            discovered_themes = self.db.save_market_themes(market_plan, market_evidence)
+            self.db.add_event(run_id, "GATE_PASSED", "market_themes_discovered", {"themes": discovered_themes, "monitor": market_plan})
             available_themes = self.db.next_themes(theme_limit)
             plan = self.runtime.run(
                 "orchestrator_agent",
                 {
+                    "current_date": current_date,
                     "available_themes": available_themes,
+                    "market_monitor": market_plan,
                     "budget_caps": {
                         "theme_limit": theme_limit,
                         "repos_per_theme": repos_per_theme,

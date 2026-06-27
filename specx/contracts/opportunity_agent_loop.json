@@ -5,6 +5,7 @@
   "domain": "open-source commercial opportunity discovery",
   "task_type": "agentic_ops_loop",
   "required_agents": [
+    "market_monitor_agent",
     "orchestrator_agent",
     "scout_agent",
     "repo_analyst",
@@ -19,11 +20,16 @@
     "openai_compatible_orchestrator_llm",
     "openai_compatible_worker_llm",
     "specx_contract_cli",
-    "compiled_agent_specs"
+    "compiled_agent_specs",
+    "market_signal_collector",
+    "market_monitor_llm"
   ],
   "required_evidence": [
     "compiled SpecX execution plan exists before loop execution",
     "compiled role/execution/output spec exists for every required agent",
+    "preconfigured static theme pools are not used as a source of opportunity themes",
+    "Market Monitor Agent selects dynamic themes from collected public market evidence before Orchestrator Agent runs",
+    "market demand and heat evidence is collected before theme selection",
     "orchestrator agent produces a run plan before Scout Agent runs",
     "skill file exists for every required agent",
     "external agency-agent skill references are compiled into each relevant agent artifact before execution",
@@ -57,6 +63,16 @@
     {
       "gate_id": "llm_available",
       "condition": "Generic orchestrator and worker LLM API keys, base URLs, and models are available before any agent execution.",
+      "on_failure": "blocked"
+    },
+    {
+      "gate_id": "market_topic_signals_collected",
+      "condition": "Market evidence collector records public demand and heat signals from configured platforms before theme selection.",
+      "on_failure": "failed"
+    },
+    {
+      "gate_id": "market_monitor_themes_created",
+      "condition": "Market Monitor Agent returns non-empty dynamic candidate themes, demand signals, heat signals, scores, and rationale before Orchestrator Agent runs.",
       "on_failure": "blocked"
     },
     {
@@ -107,6 +123,7 @@
   ],
   "expected_artifacts": [
     "build/specx/opportunity_agent_loop.plan.json",
+    "build/compiled_specs/market_monitor_agent.compiled.json",
     "build/compiled_specs/orchestrator_agent.compiled.json",
     "build/compiled_specs/scout_agent.compiled.json",
     "build/compiled_specs/repo_analyst.compiled.json",
@@ -129,7 +146,8 @@
     "llm_required_for_agent_decisions": true,
     "scripts_collect_evidence_only": true,
     "agent_core_logic_in_specs_and_skills": true,
-    "commercial_validation_not_local_deployment_validation": true
+    "commercial_validation_not_local_deployment_validation": true,
+    "no_static_theme_pool_for_discovery": true
   },
   "human_approval": {
     "required_for_task_mutation": true,

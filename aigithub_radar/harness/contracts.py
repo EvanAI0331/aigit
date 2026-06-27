@@ -28,6 +28,16 @@ APPROVAL_THRESHOLD = 80
 WATCH_THRESHOLD = 65
 
 AGENT_REQUIRED_OUTPUT_FIELDS = {
+    "market_monitor_agent": [
+        "candidate_themes",
+        "demand_signals",
+        "heat_signals",
+        "rejected_topics",
+        "demand_score",
+        "heat_score",
+        "confidence",
+        "reason",
+    ],
     "orchestrator_agent": [
         "run_name",
         "selected_themes",

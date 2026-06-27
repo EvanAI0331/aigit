@@ -4,6 +4,8 @@ Specify Validator Agent output.
 
 ## Contract
 
+All natural-language string values must be written in Simplified Chinese. Keep verdict/status enums, repository names, technology names, license identifiers, and machine-readable identifiers unchanged.
+
 Return:
 
 ```json

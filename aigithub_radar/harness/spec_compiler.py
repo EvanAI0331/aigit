@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 AGENTS = [
+    "market_monitor_agent",
     "orchestrator_agent",
     "scout_agent",
     "repo_analyst",

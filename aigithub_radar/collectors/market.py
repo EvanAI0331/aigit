@@ -5,10 +5,34 @@ import re
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
 
 
 class MarketEvidenceCollector:
     """Evidence-only public market signal collector."""
+
+    def collect_topic_signals(self) -> dict:
+        """Collect public market signals for theme discovery.
+
+        This method intentionally does not choose themes. It gathers evidence
+        from public feeds/pages so market_monitor_agent can decide.
+        """
+        trends = self._google_trending_daily(limit=20)
+        trend_titles = [item.get("title", "") for item in trends.get("items", [])[:6] if item.get("title")]
+        youtube_queries = trend_titles[:4]
+        return {
+            "collected_at": datetime.now(timezone.utc).isoformat(),
+            "sources": {
+                "hacker_news_recent": self._hacker_news_recent(),
+                "hacker_news_ask": self._hacker_news_recent(tags="ask_hn"),
+                "reddit_communities": self._reddit_communities(),
+                "product_hunt": self._product_hunt_home(),
+                "google_trends": trends,
+                "youtube": self._youtube_queries(youtube_queries),
+                "x": self._x_queries(trend_titles[:5]),
+            },
+            "note": "Evidence-only market monitoring. market_monitor_agent selects themes; scripts must not decide opportunity themes.",
+        }
 
     def collect(self, repo: dict, analysis: dict | None = None, pain: dict | None = None) -> dict:
         query = self._query(repo, analysis, pain)
@@ -50,6 +74,29 @@ class MarketEvidenceCollector:
             ],
         }
 
+    def _hacker_news_recent(self, tags: str = "story") -> dict:
+        since = int((datetime.now(timezone.utc) - timedelta(days=3)).timestamp())
+        url = "https://hn.algolia.com/api/v1/search_by_date?" + urllib.parse.urlencode(
+            {"tags": tags, "hitsPerPage": 25, "numericFilters": f"created_at_i>{since}"}
+        )
+        payload = self._get_json(url)
+        hits = payload.get("hits", []) if isinstance(payload, dict) else []
+        return {
+            "source": f"hacker_news_{tags}",
+            "available": bool(payload) and "error" not in payload,
+            "total": payload.get("nbHits", 0) if isinstance(payload, dict) else 0,
+            "items": [
+                {
+                    "title": item.get("title") or item.get("story_title"),
+                    "url": item.get("url") or item.get("story_url"),
+                    "points": item.get("points"),
+                    "comments": item.get("num_comments"),
+                    "created_at": item.get("created_at"),
+                }
+                for item in hits[:25]
+            ],
+        }
+
     def _reddit(self, query: str) -> dict:
         url = "https://www.reddit.com/search.json?" + urllib.parse.urlencode({"q": query, "sort": "relevance", "limit": 5})
         payload = self._get_json(url)
@@ -69,6 +116,39 @@ class MarketEvidenceCollector:
             ],
         }
 
+    def _reddit_communities(self) -> dict:
+        communities = [
+            "artificial",
+            "LocalLLaMA",
+            "selfhosted",
+            "SaaS",
+            "startups",
+            "nocode",
+            "MachineLearning",
+            "webdev",
+        ]
+        groups = []
+        for community in communities:
+            url = f"https://www.reddit.com/r/{community}/hot.json?" + urllib.parse.urlencode({"limit": 8})
+            payload = self._get_json(url)
+            children = (((payload or {}).get("data") or {}).get("children") or []) if isinstance(payload, dict) else []
+            groups.append(
+                {
+                    "community": community,
+                    "available": bool(children),
+                    "items": [
+                        {
+                            "title": (child.get("data") or {}).get("title"),
+                            "score": (child.get("data") or {}).get("score"),
+                            "comments": (child.get("data") or {}).get("num_comments"),
+                            "url": "https://www.reddit.com" + str((child.get("data") or {}).get("permalink", "")),
+                        }
+                        for child in children[:8]
+                    ],
+                }
+            )
+        return {"source": "reddit_communities", "available": any(group["available"] for group in groups), "groups": groups}
+
     def _product_hunt(self, query: str) -> dict:
         url = "https://www.producthunt.com/search?q=" + urllib.parse.quote_plus(query)
         html = self._get_text(url)
@@ -77,6 +157,16 @@ class MarketEvidenceCollector:
             "available": bool(html) and "error" not in html[:80].lower(),
             "query_url": url,
             "items": self._html_titles(html, limit=5),
+        }
+
+    def _product_hunt_home(self) -> dict:
+        url = "https://www.producthunt.com/"
+        html = self._get_text(url)
+        return {
+            "source": "product_hunt_home",
+            "available": bool(html) and not html.startswith("error:"),
+            "query_url": url,
+            "items": self._html_titles(html, limit=25),
         }
 
     def _youtube(self, query: str) -> dict:
@@ -90,6 +180,12 @@ class MarketEvidenceCollector:
             "items": items,
         }
 
+    def _youtube_queries(self, queries: list[str]) -> dict:
+        rows = []
+        for query in queries:
+            rows.append({"query": query, **self._youtube(query)})
+        return {"source": "youtube_queries", "available": any(row.get("available") for row in rows), "queries": rows}
+
     def _google_trends(self, query: str) -> dict:
         url = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=US"
         text = self._get_text(url)
@@ -101,6 +197,16 @@ class MarketEvidenceCollector:
             "items": items,
         }
 
+    def _google_trending_daily(self, limit: int = 25) -> dict:
+        url = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=US"
+        text = self._get_text(url)
+        return {
+            "source": "google_trends_daily",
+            "available": bool(text) and not text.startswith("error:"),
+            "query_url": url,
+            "items": self._rss_items(text, limit=limit),
+        }
+
     def _x(self, query: str) -> dict:
         url = "https://x.com/search?q=" + urllib.parse.quote_plus(query) + "&src=typed_query"
         html = self._get_text(url)
@@ -110,6 +216,12 @@ class MarketEvidenceCollector:
             "query_url": url,
             "items": self._html_titles(html, limit=5),
         }
+
+    def _x_queries(self, queries: list[str]) -> dict:
+        rows = []
+        for query in queries:
+            rows.append({"query": query, **self._x(query)})
+        return {"source": "x_queries", "available": any(row.get("available") for row in rows), "queries": rows}
 
     @staticmethod
     def _get_json(url: str) -> dict:

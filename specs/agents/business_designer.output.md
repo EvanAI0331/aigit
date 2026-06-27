@@ -4,6 +4,8 @@ Specify Business Designer output.
 
 ## Contract
 
+All natural-language string values must be written in Simplified Chinese. Keep enum-like path tokens, repository names, technology names, and machine-readable identifiers unchanged.
+
 Return:
 
 ```json
@@ -19,4 +21,3 @@ Return:
   "judgment_score": 0
 }
 ```
-
